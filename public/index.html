@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Discord Bot Control Panel - Professional bot management platform">
+  <title>Bot Control Panel | Discord Bot Manager</title>
+  
+  <!-- Styles -->
+  <link rel="stylesheet" href="css/style.css">
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
+</head>
+<body>
+  <div class="app-wrapper">
+    <!-- Mobile Menu Toggle - OUTSIDE everything -->
+    <button class="mobile-menu-btn" id="mobileMenuBtn">
+      <i class="fas fa-bars hamburger-icon"></i>
+      <i class="fas fa-times close-icon"></i>
+    </button>
+    
+    <!-- Sidebar Overlay -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <a href="/" class="logo">
+          <div class="logo-icon"><i class="fas fa-robot"></i></div>
+          <span>Bot Control</span>
+          <span class="user-badge" id="userBadge">admin</span>
+        </a>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-section">
+          <div class="nav-section-title">Management</div>
+          <a href="#" class="nav-item active" data-page="console">
+            <span class="nav-item-icon"><i class="fas fa-terminal"></i></span>
+            <span>Console</span>
+          </a>
+          <a href="#" class="nav-item" data-page="files">
+            <span class="nav-item-icon"><i class="fas fa-folder"></i></span>
+            <span>File Manager</span>
+          </a>
+          <a href="#" class="nav-item" data-page="settings">
+            <span class="nav-item-icon"><i class="fas fa-cog"></i></span>
+            <span>Settings</span>
+          </a>
+          <a href="#" class="nav-item" data-page="node-settings">
+            <span class="nav-item-icon"><i class="fas fa-code-branch"></i></span>
+            <span>Node Version</span>
+          </a>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-title">Resources</div>
+          <a href="#" class="nav-item" data-page="docs">
+            <span class="nav-item-icon"><i class="fas fa-book"></i></span>
+            <span>Documentation</span>
+          </a>
+          <a href="https://discord.com/developers" target="_blank" class="nav-item">
+            <span class="nav-item-icon"><i class="fas fa-external-link-alt"></i></span>
+            <span>Discord Portal</span>
+          </a>
+          <a href="#" class="nav-item" id="logoutBtn">
+            <span class="nav-item-icon"><i class="fas fa-sign-out-alt"></i></span>
+            <span>Logout</span>
+          </a>
+        </div>
+      </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Page: Console -->
+      <div id="page-console" class="page-content">
+        <div class="page-header">
+          <h1 class="page-title">Bot Console</h1>
+          <p class="page-description">Monitor and control your Discord bot in real-time</p>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-header">
+              <span class="stat-label">Status</span>
+              <div class="stat-icon danger" id="statusIcon">
+                <i class="fas fa-exclamation-triangle"></i>
+              </div>
+            </div>
+            <div class="stat-value" id="statusValue">OFFLINE</div>
+            <div class="stat-description">Bot is currently stopped</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-header">
+              <span class="stat-label">Uptime</span>
+              <div class="stat-icon info">
+                <i class="fas fa-clock"></i>
+              </div>
+            </div>
+            <div class="stat-value" id="uptimeValue">0m</div>
+            <div class="stat-description">Current session duration</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-header">
+              <span class="stat-label">Files</span>
+              <div class="stat-icon warning">
+                <i class="fas fa-box"></i>
+              </div>
+            </div>
+            <div class="stat-value" id="filesCount">0</div>
+            <div class="stat-description">Uploaded bot files</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-header">
+              <span class="stat-label">Memory</span>
+              <div class="stat-icon success">
+                <i class="fas fa-microchip"></i>
+              </div>
+            </div>
+            <div class="stat-value" id="memoryValue">--</div>
+            <div class="stat-description">Current usage</div>
+          </div>
+        </div>
+
+        <!-- Bot Controls Card -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <span class="card-title-icon"><i class="fas fa-gamepad"></i></span>
+              <span>Bot Controls</span>
+            </div>
+            <div>
+              <span class="status-badge stopped" id="statusBadge">
+                <span class="status-dot"></span>
+                <span>STOPPED</span>
+              </span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="btn-group">
+              <button id="startBtn" class="btn btn-success">
+                <i class="fas fa-play"></i>
+                <span>Start Bot</span>
+              </button>
+              <button id="stopBtn" class="btn btn-danger hidden">
+                <i class="fas fa-stop"></i>
+                <span>Stop Bot</span>
+              </button>
+              <button id="restartBtn" class="btn btn-secondary hidden">
+                <i class="fas fa-redo"></i>
+                <span>Restart Bot</span>
+              </button>
+              <button id="killBtn" class="btn btn-danger hidden">
+                <i class="fas fa-skull-crossbones"></i>
+                <span>Force Kill</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Console Card -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <span class="card-title-icon"><i class="fas fa-terminal"></i></span>
+              <span>Live Console</span>
+            </div>
+            <button id="clearLogsBtn" class="btn btn-secondary">
+              <i class="fas fa-trash"></i>
+              <span>Clear</span>
+            </button>
+          </div>
+          <div class="console-wrapper">
+            <div class="console-header">
+              <div class="console-dot red"></div>
+              <div class="console-dot yellow"></div>
+              <div class="console-dot green"></div>
+              <div class="console-title">bot@console:~$</div>
+            </div>
+            <div class="console" id="console">
+              <div class="console-line info">
+                <span class="console-timestamp">[SYSTEM]</span>
+                Bot Control Panel v1.0 - Waiting for bot to start...
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Page: Files -->
+      <div id="page-files" class="page-content hidden">
+        <div class="page-header">
+          <h1 class="page-title">File Manager</h1>
+          <p class="page-description">Upload and manage your bot files</p>
+        </div>
+
+        <!-- Upload Card -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <span class="card-title-icon"><i class="fas fa-upload"></i></span>
+              <span>Upload Files</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="upload-zone" id="uploadZone">
+              <input type="file" id="fileInput" style="display: none;" accept=".js,.json,.txt,.env,.md,.zip" multiple />
+              <div class="upload-icon"><i class="fas fa-cloud-upload-alt"></i></div>
+              <div class="upload-text">Drag and drop files here or click to browse</div>
+              <div class="upload-hint">Supported: .js, .json, .txt, .env, .md, .zip (Max 20MB)</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Files List Card -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <span class="card-title-icon"><i class="fas fa-folder-open"></i></span>
+              <span>Uploaded Files</span>
+            </div>
+            <div>
+              <span class="stat-description">Total: <strong id="totalFiles">0</strong></span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="file-list" id="fileList">
+              <div style="text-align: center; color: var(--text-muted); padding: 40px;">
+                <div style="font-size: 48px; margin-bottom: 16px;"><i class="fas fa-box-open"></i></div>
+                <div>No files uploaded yet</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Page: Settings -->
+      <div id="page-settings" class="page-content hidden">
+        <div class="page-header">
+          <h1 class="page-title">Bot Settings</h1>
+          <p class="page-description">Configure your Discord bot</p>
+        </div>
+
+        <!-- Token Configuration Card -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <span class="card-title-icon"><i class="fas fa-key"></i></span>
+              <span>Bot Token</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="form-group">
+              <label class="form-label">Discord Bot Token</label>
+              <input
+                type="password"
+                id="tokenInput"
+                class="form-input"
+                placeholder="MTk4NjIyNDgzNDcxOTI1MjQ4.Cls2jB.SomeVeryLongTokenString"
+                autocomplete="off"
+              />
+              <div style="margin-top: 8px; font-size: 12px; color: var(--text-muted);">
+                <i class="fas fa-lock"></i> Your token is stored securely and never exposed in logs
+              </div>
+            </div>
+            <button id="saveTokenBtn" class="btn btn-primary">
+              <i class="fas fa-save"></i>
+              <span>Save Token</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Bot Information Card -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <span class="card-title-icon"><i class="fas fa-info-circle"></i></span>
+              <span>Bot Information</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div style="display: grid; gap: 16px;">
+              <div>
+                <div class="form-label">Main File</div>
+                <div style="color: var(--text-secondary);">index.js, bot.js, main.js, or app.js</div>
+              </div>
+              <div>
+                <div class="form-label">Required Files</div>
+                <div style="color: var(--text-secondary);"><i class="fas fa-circle" style="font-size: 6px; margin-right: 8px;"></i> Bot main file (required)</div>
+                <div style="color: var(--text-secondary);"><i class="fas fa-circle" style="font-size: 6px; margin-right: 8px;"></i> package.json (for dependencies)</div>
+                <div style="color: var(--text-secondary);"><i class="fas fa-circle" style="font-size: 6px; margin-right: 8px;"></i> Additional modules (optional)</div>
+              </div>
+              <div>
+                <div class="form-label">How It Works</div>
+                <div style="color: var(--text-secondary); line-height: 1.8;">
+                  1. Upload your bot files<br>
+                  2. Set your Discord bot token<br>
+                  3. Click "Start Bot" to run<br>
+                  4. Monitor logs in real-time
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Page: Node Settings -->
+      <div id="page-node-settings" class="page-content hidden">
+        <div class="page-header">
+          <h1 class="page-title">Node.js Settings</h1>
+          <p class="page-description">Select and manage Node.js versions for your bot</p>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <span class="card-title-icon"><i class="fas fa-code-branch"></i></span>
+              <span>Node.js Version Management</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="form-group">
+              <label class="form-label">Current Node.js Version</label>
+              <div class="current-node-version" id="currentNodeVersion">
+                Loading...
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Select Node.js Version</label>
+              <div class="node-versions-grid" id="nodeVersionsGrid">
+                <!-- Versi akan diisi oleh JavaScript -->
+              </div>
+            </div>
+
+            <div class="alert alert-info">
+              <i class="fas fa-info-circle"></i>
+              <strong>Note:</strong> Changing Node.js version will require restarting the bot if it's running.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Page: Docs -->
+      <div id="page-docs" class="page-content hidden">
+        <div class="page-header">
+          <h1 class="page-title">Documentation</h1>
+          <p class="page-description">Learn how to use the Bot Control Panel</p>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <span class="card-title-icon"><i class="fas fa-book"></i></span>
+              <span>Quick Start Guide</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div style="display: grid; gap: 24px;">
+              <div>
+                <h3 style="color: var(--accent-primary); margin-bottom: 8px;">
+                  <i class="fas fa-key"></i> 1. Get Your Bot Token
+                </h3>
+                <p style="color: var(--text-secondary); line-height: 1.8;">
+                  Visit the <a href="https://discord.com/developers" target="_blank" style="color: var(--text-link);">Discord Developer Portal</a>,
+                  create a new application, navigate to the "Bot" section, and copy your bot token.
+                </p>
+              </div>
+              
+              <div>
+                <h3 style="color: var(--accent-primary); margin-bottom: 8px;">
+                  <i class="fas fa-upload"></i> 2. Upload Your Bot Files
+                </h3>
+                <p style="color: var(--text-secondary); line-height: 1.8;">
+                  Go to the File Manager and upload your bot's JavaScript files. Make sure you have a main file
+                  (index.js, bot.js, main.js, or app.js) and a package.json if you use any dependencies.
+                </p>
+              </div>
+              
+              <div>
+                <h3 style="color: var(--accent-primary); margin-bottom: 8px;">
+                  <i class="fas fa-cog"></i> 3. Configure Settings
+                </h3>
+                <p style="color: var(--text-secondary); line-height: 1.8;">
+                  Navigate to Settings and paste your bot token. The panel will securely store it and use it
+                  when starting your bot.
+                </p>
+              </div>
+              
+              <div>
+                <h3 style="color: var(--accent-primary); margin-bottom: 8px;">
+                  <i class="fas fa-play"></i> 4. Start Your Bot
+                </h3>
+                <p style="color: var(--text-secondary); line-height: 1.8;">
+                  Return to the Console page and click "Start Bot". Your bot will install dependencies automatically
+                  and start running. Monitor the live console for any errors or logs.
+                </p>
+              </div>
+
+              <div>
+                <h3 style="color: var(--accent-primary); margin-bottom: 8px;">
+                  <i class="fas fa-code-branch"></i> 5. Node.js Version
+                </h3>
+                <p style="color: var(--text-secondary); line-height: 1.8;">
+                  You can select different Node.js versions (18-21) from the Node Version page.
+                  This is useful if your bot requires a specific Node.js version.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- JavaScript -->
+  <script src="js/app.js"></script>
+</body>
+</html>
