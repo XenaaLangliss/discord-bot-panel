@@ -1,4 +1,4 @@
-/* Discord Bot Control Panel - Mobile Fixed Version */
+/* Discord Bot Control Panel - Pterodactyl-Inspired Design */
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 :root {
@@ -98,7 +98,7 @@ body::before {
   font-weight: 600;
 }
 
-/* Mobile Menu Button - ALWAYS ON TOP */
+/* Mobile Menu Button */
 .mobile-menu-btn {
   display: none;
   position: fixed;
@@ -449,9 +449,13 @@ body::before {
   padding: 24px;
 }
 
-/* Console */
+/* PTERODACTYL-STYLE CONSOLE */
 .console-wrapper {
   position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #000000;
+  box-shadow: var(--shadow-xl);
 }
 
 .console-header {
@@ -459,8 +463,8 @@ body::before {
   align-items: center;
   gap: 8px;
   padding: 12px 16px;
-  background: var(--bg-tertiary);
-  border-bottom: 1px solid var(--border-primary);
+  background: #1a1a1a;
+  border-bottom: 1px solid #2a2a2a;
 }
 
 .console-dot {
@@ -479,38 +483,84 @@ body::before {
   padding-left: 12px;
   font-size: 12px;
   font-weight: 600;
-  color: var(--text-muted);
+  color: #6b7280;
+  font-family: 'JetBrains Mono', monospace;
 }
 
 .console {
   background: #000000;
   padding: 16px;
-  height: 480px;
+  height: 500px;
   overflow-y: auto;
   font-family: 'JetBrains Mono', 'Courier New', monospace;
   font-size: 13px;
-  line-height: 1.6;
-  color: #00ff00;
-  text-align: left;
+  line-height: 1.8;
+  color: #e5e7eb;
 }
 
 .console-line {
   margin-bottom: 4px;
   white-space: pre-wrap;
   word-break: break-word;
-  text-align: left !important;
-  font-family: 'JetBrains Mono', 'Courier New', monospace;
-  padding-left: 8px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background 0.15s ease;
 }
 
-.console-line.info { color: #00b0f4; }
-.console-line.success { color: #43b581; }
-.console-line.error { color: #f04747; }
-.console-line.warning { color: #faa61a; }
+.console-line:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
 
 .console-timestamp {
-  color: #72767d;
-  margin-right: 8px;
+  color: #6b7280;
+  font-weight: 600;
+  min-width: 90px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.console-line.info {
+  color: #60a5fa;
+}
+
+.console-line.info .console-timestamp {
+  color: #3b82f6;
+}
+
+.console-line.success {
+  color: #34d399;
+}
+
+.console-line.success .console-timestamp {
+  color: #10b981;
+}
+
+.console-line.error {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.05);
+}
+
+.console-line.error .console-timestamp {
+  color: #ef4444;
+}
+
+.console-line.warning {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.05);
+}
+
+.console-line.warning .console-timestamp {
+  color: #f59e0b;
+}
+
+/* Auto-scroll indicator */
+.console::after {
+  content: '';
+  display: block;
+  height: 1px;
 }
 
 /* Buttons */
@@ -541,9 +591,21 @@ body::before {
   color: white;
 }
 
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(88, 101, 242, 0.4);
+}
+
 .btn-success {
   background: var(--success);
   color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+  background: var(--success-dim);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(67, 181, 129, 0.4);
 }
 
 .btn-danger {
@@ -551,10 +613,21 @@ body::before {
   color: white;
 }
 
+.btn-danger:hover:not(:disabled) {
+  background: var(--danger-dim);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(240, 71, 71, 0.4);
+}
+
 .btn-secondary {
   background: var(--bg-elevated);
   color: var(--text-secondary);
   border: 1px solid var(--border-primary);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--bg-tertiary);
+  border-color: var(--border-secondary);
 }
 
 .btn-group {
@@ -607,6 +680,11 @@ body::before {
   background: var(--bg-tertiary);
 }
 
+.upload-zone:hover {
+  border-color: var(--accent-primary);
+  background: rgba(88, 101, 242, 0.05);
+}
+
 .upload-icon {
   font-size: 48px;
   margin-bottom: 16px;
@@ -638,6 +716,12 @@ body::before {
   border: 1px solid var(--border-primary);
   border-radius: 8px;
   margin-bottom: 8px;
+  transition: all var(--transition-fast);
+}
+
+.file-item:hover {
+  border-color: var(--border-secondary);
+  background: var(--bg-elevated);
 }
 
 .file-icon {
@@ -666,6 +750,11 @@ body::before {
   color: var(--text-muted);
 }
 
+.file-actions {
+  display: flex;
+  gap: 8px;
+}
+
 .icon-btn {
   width: 36px;
   height: 36px;
@@ -683,6 +772,7 @@ body::before {
 .icon-btn:hover {
   background: var(--danger);
   color: white;
+  transform: scale(1.1);
 }
 
 /* Toast */
@@ -706,6 +796,18 @@ body::before {
   display: flex;
   align-items: center;
   gap: 12px;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
 .toast.success { border-left: 3px solid var(--success); }
@@ -818,7 +920,7 @@ body::before {
 
 .hidden { display: none !important; }
 
-/* ==================== RESPONSIVE MOBILE ==================== */
+/* RESPONSIVE MOBILE */
 @media (max-width: 1024px) {
   .mobile-menu-btn {
     display: flex;
@@ -847,7 +949,7 @@ body::before {
   }
   
   .console {
-    height: 300px;
+    height: 350px;
     font-size: 11px;
   }
   
