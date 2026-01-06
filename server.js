@@ -69,7 +69,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Storage setup
+// Storage setup - FIXED: Tidak menambahkan username ke nama file
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const dir = './bot_files';
@@ -79,10 +79,9 @@ const storage = multer.diskStorage({
     cb(null, dir);
   },
   filename: (req, file, cb) => {
+    // FIXED: Hanya sanitize nama file, tidak menambahkan username
     const sanitized = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const timestamp = Date.now();
-    const username = req.session.username || 'unknown';
-    cb(null, `${username}_${timestamp}_${sanitized}`);
+    cb(null, sanitized);
   }
 });
 
@@ -197,7 +196,7 @@ const validateBotToken = (token) => {
   return true;
 };
 
-// ZIP Extraction function
+// FIXED: ZIP Extraction function - Perbaikan ekstraksi ZIP
 const extractZipFile = async (zipPath, extractDir) => {
   return new Promise(async (resolve, reject) => {
     try {
@@ -207,28 +206,50 @@ const extractZipFile = async (zipPath, extractDir) => {
       
       let extractedCount = 0;
       let skippedCount = 0;
+      const extractedFiles = [];
+      
+      // Pastikan directory tujuan ada
+      if (!fs.existsSync(extractDir)) {
+        fs.mkdirSync(extractDir, { recursive: true });
+      }
       
       for (const entry of zipEntries) {
         try {
-          const entryPath = path.join(extractDir, entry.entryName);
-          
-          if (!entryPath.startsWith(path.resolve(extractDir))) {
+          // Skip __MACOSX dan hidden files
+          if (entry.entryName.includes('__MACOSX') || entry.entryName.startsWith('.')) {
             skippedCount++;
             continue;
           }
           
+          // Dapatkan path lengkap
+          const entryPath = path.join(extractDir, entry.entryName);
+          
+          // Security check
+          if (!entryPath.startsWith(path.resolve(extractDir))) {
+            skippedCount++;
+            addLog(`Skipped dangerous path: ${entry.entryName}`, 'warning');
+            continue;
+          }
+          
           if (entry.isDirectory) {
+            // Buat direktori jika belum ada
             if (!fs.existsSync(entryPath)) {
               fs.mkdirSync(entryPath, { recursive: true });
             }
           } else {
+            // Pastikan parent directory ada
             const parentDir = path.dirname(entryPath);
             if (!fs.existsSync(parentDir)) {
               fs.mkdirSync(parentDir, { recursive: true });
             }
             
-            zip.extractEntryTo(entry, extractDir, false, true);
+            // Extract file
+            const content = entry.getData();
+            fs.writeFileSync(entryPath, content);
+            
             extractedCount++;
+            extractedFiles.push(entry.entryName);
+            addLog(`Extracted: ${entry.entryName}`, 'info');
           }
         } catch (err) {
           skippedCount++;
@@ -236,9 +257,21 @@ const extractZipFile = async (zipPath, extractDir) => {
         }
       }
       
-      fs.unlinkSync(zipPath);
+      // Hapus file ZIP setelah ekstraksi
+      try {
+        fs.unlinkSync(zipPath);
+      } catch (err) {
+        addLog(`Warning: Could not delete ZIP file: ${err.message}`, 'warning');
+      }
       
-      resolve({ extractedCount, skippedCount, total: zipEntries.length });
+      addLog(`Extraction complete: ${extractedCount} files extracted, ${skippedCount} skipped`, 'success');
+      
+      resolve({ 
+        extractedCount, 
+        skippedCount, 
+        total: zipEntries.length,
+        files: extractedFiles
+      });
     } catch (error) {
       reject(new Error(`Failed to extract ZIP: ${error.message}`));
     }
@@ -420,6 +453,7 @@ app.post('/api/upload', async (req, res) => {
           message: 'ZIP file extracted successfully',
           filename: req.file.originalname,
           extractedCount: result.extractedCount,
+          extractedFiles: result.files,
           type: 'zip'
         });
       } else {
@@ -674,6 +708,7 @@ app.post('/api/stop', (req, res) => {
   }
 });
 
+// FIXED: Delete file untuk semua tipe file
 app.delete('/api/files/:filename', (req, res) => {
   const filename = req.params.filename;
   const username = req.session.username;
@@ -688,8 +723,9 @@ app.delete('/api/files/:filename', (req, res) => {
     return res.status(404).json({ error: 'File not found' });
   }
   
-  if (filename === '.env' && botStatus === 'running') {
-    return res.status(400).json({ error: 'Cannot delete .env file while bot is running' });
+  // Cek apakah bot sedang running
+  if (botStatus === 'running') {
+    return res.status(400).json({ error: 'Cannot delete files while bot is running. Please stop the bot first.' });
   }
   
   try {
@@ -697,11 +733,12 @@ app.delete('/api/files/:filename', (req, res) => {
     
     if (stats.isDirectory()) {
       fs.rmSync(filepath, { recursive: true, force: true });
+      addLog(`Directory deleted: ${filename}`, 'warning', username);
     } else {
       fs.unlinkSync(filepath);
+      addLog(`File deleted: ${filename}`, 'warning', username);
     }
     
-    addLog(`File deleted: ${filename}`, 'warning', username);
     res.json({ 
       message: 'File deleted successfully',
       filename: filename
