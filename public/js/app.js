@@ -9,6 +9,7 @@ class BotControlPanel {
     this.currentFileMenu = null;
     this.activeToasts = []; // Track active toasts
     this.maxToasts = 3; // Maximum 3 toasts
+    this.currentPath = ''; // Current folder path
     this.init();
   }
 
@@ -680,28 +681,70 @@ class BotControlPanel {
         return b.modified - a.modified;
       });
 
-      fileList.innerHTML = sortedFiles.map(file => {
+      // Filter files based on current path
+      const displayFiles = sortedFiles.filter(file => {
+        if (this.currentPath === '') {
+          // Root: show only files without / in name
+          return !file.name.includes('/');
+        } else {
+          // Inside folder: show files that start with currentPath
+          return file.name.startsWith(this.currentPath + '/') && 
+                 file.name.split('/').length === this.currentPath.split('/').length + 1;
+        }
+      });
+
+      // Breadcrumb
+      let breadcrumbHTML = `
+        <div class="file-breadcrumb">
+          <i class="fas fa-folder"></i>
+          <span>Path:</span>
+          <span style="color: var(--accent-primary); cursor: pointer;" onclick="botPanel.navigateToFolder('')">
+            /bot_files
+          </span>
+      `;
+      
+      if (this.currentPath) {
+        const pathParts = this.currentPath.split('/');
+        let buildPath = '';
+        pathParts.forEach((part, index) => {
+          buildPath += (index > 0 ? '/' : '') + part;
+          const finalPath = buildPath;
+          breadcrumbHTML += `
+            <span>/</span>
+            <span style="color: var(--accent-primary); cursor: pointer;" onclick="botPanel.navigateToFolder('${finalPath}')">
+              ${part}
+            </span>
+          `;
+        });
+      }
+      
+      breadcrumbHTML += '</div>';
+
+      fileList.innerHTML = breadcrumbHTML + (displayFiles.length === 0 ? `
+        <div style="text-align: center; color: var(--text-muted); padding: 40px;">
+          <div style="font-size: 48px; margin-bottom: 16px;"><i class="fas fa-folder-open"></i></div>
+          <div>Empty folder</div>
+        </div>
+      ` : displayFiles.map(file => {
         const icon = this.getFileIcon(file.name, file.isDirectory);
         const isZip = file.type === '.zip';
         const isFolder = file.isDirectory;
         const isEditable = !isFolder && this.isEditableFile(file.name);
-        const filePath = `./bot_files/${file.name}`;
+        const displayName = this.currentPath ? file.name.replace(this.currentPath + '/', '') : file.name;
         
         return `
-          <div class="file-item">
+          <div class="file-item" ${isFolder ? `style="cursor: pointer;" onclick="botPanel.navigateToFolder('${this.escapeHtml(file.name)}')"` : ''}>
             <div class="file-icon">${icon}</div>
             <div class="file-info">
               <div class="file-name">
-                ${isFolder ? '📁 ' : ''}${this.escapeHtml(file.name)}
+                ${isFolder ? '📁 ' : ''}${this.escapeHtml(displayName)}
                 ${isFolder ? ' <span style="color: var(--text-muted); font-size: 12px;">(Folder)</span>' : ''}
               </div>
               <div class="file-meta">
-                <span style="color: var(--text-muted); font-size: 11px;">${this.escapeHtml(filePath)}</span>
-                <span style="margin: 0 8px;">•</span>
                 ${isFolder ? 'Folder' : this.formatFileSize(file.size)} • ${file.type || 'file'} • ${new Date(file.modified).toLocaleDateString()}
               </div>
             </div>
-            <div class="file-actions">
+            <div class="file-actions" onclick="event.stopPropagation()">
               <button class="file-menu-btn" onclick="botPanel.toggleFileMenu('${this.escapeHtml(file.name)}', event)">
                 <i class="fas fa-ellipsis-v"></i>
               </button>
@@ -732,10 +775,15 @@ class BotControlPanel {
             </div>
           </div>
         `;
-      }).join('');
+      }).join(''));
     } catch (error) {
       console.error('Error updating files list:', error);
     }
+  }
+
+  navigateToFolder(folderPath) {
+    this.currentPath = folderPath;
+    this.updateFilesList();
   }
 
   isEditableFile(filename) {
