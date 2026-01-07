@@ -1,4 +1,4 @@
-// Discord Bot Control Panel v1.0 - Main Application
+// Discord Bot Control Panel v2.0 - Enhanced with File Editor
 
 class BotControlPanel {
   constructor() {
@@ -6,6 +6,7 @@ class BotControlPanel {
     this.isPolling = false;
     this.currentPage = 'console';
     this.uptimeInterval = null;
+    this.currentFileMenu = null;
     this.init();
   }
 
@@ -18,6 +19,22 @@ class BotControlPanel {
     this.setupLogout();
     this.startPolling();
     this.updateMemoryUsage();
+    this.setupGlobalClickHandler();
+  }
+
+  setupGlobalClickHandler() {
+    document.addEventListener('click', (e) => {
+      if (this.currentFileMenu && !e.target.closest('.file-menu-btn') && !e.target.closest('.file-menu')) {
+        this.closeAllFileMenus();
+      }
+    });
+  }
+
+  closeAllFileMenus() {
+    document.querySelectorAll('.file-menu').forEach(menu => {
+      menu.classList.remove('active');
+    });
+    this.currentFileMenu = null;
   }
 
   async checkAuth() {
@@ -142,6 +159,9 @@ class BotControlPanel {
     document.getElementById('restartBtn')?.addEventListener('click', () => this.restartBot());
     document.getElementById('killBtn')?.addEventListener('click', () => this.killBot());
     document.getElementById('clearLogsBtn')?.addEventListener('click', () => this.clearLogs());
+    
+    // Create file/folder button
+    document.getElementById('createFileBtn')?.addEventListener('click', () => this.showCreateModal());
   }
 
   setupLogout() {
@@ -231,15 +251,15 @@ class BotControlPanel {
       const data = await response.json();
 
       if (response.ok) {
-        this.showToast('✅ Token saved successfully!', 'success');
+        this.showToast('Token saved successfully!', 'success');
         tokenInput.value = '';
         await this.updateStatus();
       } else {
-        this.showToast(`❌ ${data.error || 'Failed to save token'}`, 'error');
+        this.showToast(data.error || 'Failed to save token', 'error');
       }
     } catch (error) {
       console.error('Error saving token:', error);
-      this.showToast('❌ Network error. Please try again.', 'error');
+      this.showToast('Network error. Please try again.', 'error');
     } finally {
       saveBtn.disabled = false;
       saveBtn.innerHTML = originalText;
@@ -257,17 +277,9 @@ class BotControlPanel {
   }
 
   async uploadFile(file) {
-    const allowedExtensions = ['.js', '.json', '.txt', '.env', '.md', '.zip'];
-    const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
-
-    if (!allowedExtensions.includes(fileExtension)) {
-      this.showToast('❌ Invalid file type. Allowed: .js, .json, .txt, .env, .md, .zip', 'error');
-      return;
-    }
-
-    const maxSize = 20 * 1024 * 1024;
+    const maxSize = 100 * 1024 * 1024; // 100MB
     if (file.size > maxSize) {
-      this.showToast('❌ File too large. Maximum size: 20MB', 'error');
+      this.showToast('File too large. Maximum size: 100MB', 'error');
       return;
     }
 
@@ -291,24 +303,168 @@ class BotControlPanel {
         if (data.isZip) {
           this.showToast(`📦 ZIP uploaded: ${file.name}`, 'success');
         } else {
-          this.showToast(`✅ Uploaded: ${file.name}`, 'success');
+          this.showToast(`Uploaded: ${file.name}`, 'success');
         }
         await this.updateFilesList();
         await this.updateStatus();
       } else {
-        this.showToast(`❌ ${data.error || 'Upload failed'}`, 'error');
+        this.showToast(data.error || 'Upload failed', 'error');
       }
     } catch (error) {
       console.error('Error uploading file:', error);
-      this.showToast('❌ Upload failed. Please try again.', 'error');
+      this.showToast('Upload failed. Please try again.', 'error');
     } finally {
       uploadZone.querySelector('.upload-text').textContent = originalText;
       uploadZone.style.opacity = '1';
     }
   }
 
-  // MANUAL ZIP EXTRACTION
+  // FILE MENU SYSTEM
+  toggleFileMenu(filename, event) {
+    event.stopPropagation();
+    
+    const menu = event.target.closest('.file-item').querySelector('.file-menu');
+    const allMenus = document.querySelectorAll('.file-menu');
+    
+    allMenus.forEach(m => {
+      if (m !== menu) {
+        m.classList.remove('active');
+      }
+    });
+    
+    menu.classList.toggle('active');
+    this.currentFileMenu = menu.classList.contains('active') ? menu : null;
+  }
+
+  // EDIT FILE
+  async editFile(filename) {
+    this.closeAllFileMenus();
+    
+    try {
+      const response = await fetch(`/api/files/${encodeURIComponent(filename)}/content`);
+      
+      if (!response.ok) {
+        const data = await response.json();
+        this.showToast(data.error || 'Failed to load file', 'error');
+        return;
+      }
+      
+      const data = await response.json();
+      this.showEditorModal(filename, data.content);
+    } catch (error) {
+      console.error('Error loading file:', error);
+      this.showToast('Failed to load file', 'error');
+    }
+  }
+
+  showEditorModal(filename, content) {
+    const modal = document.createElement('div');
+    modal.className = 'editor-modal-overlay';
+    modal.innerHTML = `
+      <div class="editor-modal">
+        <div class="editor-modal-header">
+          <h3><i class="fas fa-edit"></i> Edit File: ${this.escapeHtml(filename)}</h3>
+          <button class="icon-btn" onclick="this.closest('.editor-modal-overlay').remove()">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="editor-modal-body">
+          <textarea class="form-textarea" id="fileContentEditor">${this.escapeHtml(content)}</textarea>
+        </div>
+        <div class="editor-modal-footer">
+          <button class="btn btn-secondary" onclick="this.closest('.editor-modal-overlay').remove()">Cancel</button>
+          <button class="btn btn-success" id="saveFileBtn">
+            <i class="fas fa-save"></i> Save
+          </button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    const saveBtn = modal.querySelector('#saveFileBtn');
+    saveBtn.addEventListener('click', () => this.saveFileContent(filename, modal));
+    
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.remove();
+      }
+    });
+  }
+
+  async saveFileContent(filename, modal) {
+    const editor = modal.querySelector('#fileContentEditor');
+    const content = editor.value;
+    const saveBtn = modal.querySelector('#saveFileBtn');
+    
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<span class="spinner"></span> Saving...';
+    
+    try {
+      const response = await fetch(`/api/files/${encodeURIComponent(filename)}/content`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content })
+      });
+      
+      if (response.ok) {
+        this.showToast('File saved successfully!', 'success');
+        modal.remove();
+        await this.updateFilesList();
+      } else {
+        const data = await response.json();
+        this.showToast(data.error || 'Failed to save file', 'error');
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<i class="fas fa-save"></i> Save';
+      }
+    } catch (error) {
+      console.error('Error saving file:', error);
+      this.showToast('Failed to save file', 'error');
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = '<i class="fas fa-save"></i> Save';
+    }
+  }
+
+  // COPY FILE PATH
+  copyFilePath(filename) {
+    this.closeAllFileMenus();
+    
+    const path = `./bot_files/${filename}`;
+    
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(path).then(() => {
+        this.showToast('Path copied to clipboard!', 'success');
+      }).catch(() => {
+        this.fallbackCopyTextToClipboard(path);
+      });
+    } else {
+      this.fallbackCopyTextToClipboard(path);
+    }
+  }
+
+  fallbackCopyTextToClipboard(text) {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-999999px';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    
+    try {
+      document.execCommand('copy');
+      this.showToast('Path copied to clipboard!', 'success');
+    } catch (err) {
+      this.showToast('Failed to copy path', 'error');
+    }
+    
+    document.body.removeChild(textArea);
+  }
+
+  // EXTRACT ZIP
   async extractZip(filename) {
+    this.closeAllFileMenus();
+    
     try {
       this.showToast('📦 Extracting ZIP...', 'info');
       
@@ -319,20 +475,22 @@ class BotControlPanel {
       const data = await response.json();
 
       if (response.ok) {
-        this.showToast(`✅ Extracted ${data.extractedCount} files!`, 'success');
+        this.showToast(`Extracted ${data.extractedCount} files!`, 'success');
         await this.updateFilesList();
         await this.updateStatus();
       } else {
-        this.showToast(`❌ ${data.error || 'Extraction failed'}`, 'error');
+        this.showToast(data.error || 'Extraction failed', 'error');
       }
     } catch (error) {
       console.error('Error extracting ZIP:', error);
-      this.showToast('❌ Extraction failed. Please try again.', 'error');
+      this.showToast('Extraction failed. Please try again.', 'error');
     }
   }
 
+  // DELETE FILE
   async deleteFile(filename) {
-    // MODERN DELETE CONFIRMATION
+    this.closeAllFileMenus();
+    
     const confirmDelete = await this.showConfirmDialog(
       'Delete File',
       `Are you sure you want to delete "${filename}"?`,
@@ -348,16 +506,125 @@ class BotControlPanel {
       });
 
       if (response.ok) {
-        this.showToast(`🗑️ Deleted: ${filename}`, 'success');
+        this.showToast(`Deleted: ${filename}`, 'success');
         await this.updateFilesList();
         await this.updateStatus();
       } else {
         const data = await response.json();
-        this.showToast(`❌ ${data.error || 'Delete failed'}`, 'error');
+        this.showToast(data.error || 'Delete failed', 'error');
       }
     } catch (error) {
       console.error('Error deleting file:', error);
-      this.showToast('❌ Delete failed. Please try again.', 'error');
+      this.showToast('Delete failed. Please try again.', 'error');
+    }
+  }
+
+  // CREATE FILE/FOLDER MODAL
+  showCreateModal() {
+    const modal = document.createElement('div');
+    modal.className = 'create-modal-overlay';
+    modal.innerHTML = `
+      <div class="create-modal">
+        <div class="create-modal-header">
+          <h3><i class="fas fa-plus"></i> Create New</h3>
+        </div>
+        <div class="create-modal-body">
+          <div class="create-type-selector">
+            <div class="create-type-option active" data-type="file">
+              <i class="fas fa-file"></i>
+              <span>File</span>
+            </div>
+            <div class="create-type-option" data-type="folder">
+              <i class="fas fa-folder"></i>
+              <span>Folder</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Name</label>
+            <input type="text" class="form-input" id="createNameInput" placeholder="Enter name..." />
+          </div>
+        </div>
+        <div class="create-modal-footer">
+          <button class="btn btn-secondary" onclick="this.closest('.create-modal-overlay').remove()">Cancel</button>
+          <button class="btn btn-success" id="createConfirmBtn">
+            <i class="fas fa-check"></i> Create
+          </button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    let selectedType = 'file';
+    
+    const typeOptions = modal.querySelectorAll('.create-type-option');
+    typeOptions.forEach(option => {
+      option.addEventListener('click', () => {
+        typeOptions.forEach(opt => opt.classList.remove('active'));
+        option.classList.add('active');
+        selectedType = option.dataset.type;
+      });
+    });
+    
+    const confirmBtn = modal.querySelector('#createConfirmBtn');
+    const nameInput = modal.querySelector('#createNameInput');
+    
+    confirmBtn.addEventListener('click', () => {
+      const name = nameInput.value.trim();
+      if (!name) {
+        this.showToast('Please enter a name', 'error');
+        return;
+      }
+      this.createFileOrFolder(name, selectedType === 'folder', modal);
+    });
+    
+    nameInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        confirmBtn.click();
+      }
+    });
+    
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.remove();
+      }
+    });
+    
+    setTimeout(() => nameInput.focus(), 100);
+  }
+
+  async createFileOrFolder(filename, isFolder, modal) {
+    const confirmBtn = modal.querySelector('#createConfirmBtn');
+    confirmBtn.disabled = true;
+    confirmBtn.innerHTML = '<span class="spinner"></span> Creating...';
+    
+    try {
+      const response = await fetch('/api/files/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          filename, 
+          content: '', 
+          isFolder 
+        })
+      });
+      
+      if (response.ok) {
+        this.showToast(`${isFolder ? 'Folder' : 'File'} created successfully!`, 'success');
+        modal.remove();
+        await this.updateFilesList();
+        await this.updateStatus();
+      } else {
+        const data = await response.json();
+        this.showToast(data.error || 'Failed to create', 'error');
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = '<i class="fas fa-check"></i> Create';
+      }
+    } catch (error) {
+      console.error('Error creating:', error);
+      this.showToast('Failed to create', 'error');
+      confirmBtn.disabled = false;
+      confirmBtn.innerHTML = '<i class="fas fa-check"></i> Create';
     }
   }
 
@@ -369,7 +636,7 @@ class BotControlPanel {
       dialog.innerHTML = `
         <div class="confirm-dialog">
           <div class="confirm-dialog-header">
-            <h3>${this.escapeHtml(title)}</h3>
+            <h3><i class="fas fa-exclamation-triangle"></i> ${this.escapeHtml(title)}</h3>
           </div>
           <div class="confirm-dialog-body">
             <p>${this.escapeHtml(message)}</p>
@@ -433,6 +700,7 @@ class BotControlPanel {
       fileList.innerHTML = files.map(file => {
         const icon = this.getFileIcon(file.name);
         const isZip = file.type === '.zip';
+        const isEditable = this.isEditableFile(file.name);
         
         return `
           <div class="file-item">
@@ -442,14 +710,31 @@ class BotControlPanel {
               <div class="file-meta">${this.formatFileSize(file.size)} • ${file.type || 'file'} • ${new Date(file.modified).toLocaleDateString()}</div>
             </div>
             <div class="file-actions">
-              ${isZip ? `
-                <button class="btn btn-primary btn-sm" onclick="botPanel.extractZip('${this.escapeHtml(file.name)}')" title="Extract ZIP">
-                  <i class="fas fa-file-archive"></i> Extract
-                </button>
-              ` : ''}
-              <button class="icon-btn" onclick="botPanel.deleteFile('${this.escapeHtml(file.name)}')" title="Delete">
-                <i class="fas fa-trash"></i>
+              <button class="file-menu-btn" onclick="botPanel.toggleFileMenu('${this.escapeHtml(file.name)}', event)">
+                <i class="fas fa-ellipsis-v"></i>
               </button>
+              <div class="file-menu">
+                ${isEditable ? `
+                  <div class="file-menu-item" onclick="botPanel.editFile('${this.escapeHtml(file.name)}')">
+                    <i class="fas fa-edit"></i>
+                    <span>Edit</span>
+                  </div>
+                ` : ''}
+                ${isZip ? `
+                  <div class="file-menu-item" onclick="botPanel.extractZip('${this.escapeHtml(file.name)}')">
+                    <i class="fas fa-file-archive"></i>
+                    <span>Extract</span>
+                  </div>
+                ` : ''}
+                <div class="file-menu-item" onclick="botPanel.copyFilePath('${this.escapeHtml(file.name)}')">
+                  <i class="fas fa-copy"></i>
+                  <span>Copy Path</span>
+                </div>
+                <div class="file-menu-item danger" onclick="botPanel.deleteFile('${this.escapeHtml(file.name)}')">
+                  <i class="fas fa-trash"></i>
+                  <span>Delete</span>
+                </div>
+              </div>
             </div>
           </div>
         `;
@@ -457,6 +742,12 @@ class BotControlPanel {
     } catch (error) {
       console.error('Error updating files list:', error);
     }
+  }
+
+  isEditableFile(filename) {
+    const editableExtensions = ['.js', '.json', '.txt', '.env', '.md', '.html', '.css', '.xml', '.yml', '.yaml'];
+    const ext = '.' + filename.split('.').pop().toLowerCase();
+    return editableExtensions.includes(ext);
   }
 
   getFileIcon(filename) {
@@ -467,7 +758,9 @@ class BotControlPanel {
       'txt': '<i class="fas fa-file-alt" style="color: #43b581;"></i>',
       'env': '<i class="fas fa-lock" style="color: #f04747;"></i>',
       'md': '<i class="fas fa-file" style="color: #7289da;"></i>',
-      'zip': '<i class="fas fa-file-archive" style="color: #faa61a;"></i>'
+      'zip': '<i class="fas fa-file-archive" style="color: #faa61a;"></i>',
+      'html': '<i class="fab fa-html5" style="color: #e34c26;"></i>',
+      'css': '<i class="fab fa-css3" style="color: #264de4;"></i>'
     };
     return icons[ext] || '<i class="fas fa-file"></i>';
   }
@@ -486,13 +779,13 @@ class BotControlPanel {
         this.showToast('🚀 Bot is starting...', 'success');
         await this.updateStatus();
       } else {
-        this.showToast(`❌ ${data.error || 'Failed to start'}`, 'error');
+        this.showToast(data.error || 'Failed to start', 'error');
         startBtn.disabled = false;
         startBtn.innerHTML = originalText;
       }
     } catch (error) {
       console.error('Error starting bot:', error);
-      this.showToast('❌ Failed to start bot', 'error');
+      this.showToast('Failed to start bot', 'error');
       startBtn.disabled = false;
       startBtn.innerHTML = originalText;
     }
@@ -508,15 +801,15 @@ class BotControlPanel {
       const response = await fetch('/api/stop', { method: 'POST' });
 
       if (response.ok) {
-        this.showToast('⏹️ Bot stopped', 'success');
+        this.showToast('Bot stopped', 'success');
         await this.updateStatus();
       } else {
         const data = await response.json();
-        this.showToast(`❌ ${data.error || 'Failed to stop'}`, 'error');
+        this.showToast(data.error || 'Failed to stop', 'error');
       }
     } catch (error) {
       console.error('Error stopping bot:', error);
-      this.showToast('❌ Failed to stop bot', 'error');
+      this.showToast('Failed to stop bot', 'error');
     } finally {
       stopBtn.disabled = false;
       stopBtn.innerHTML = originalText;
@@ -548,14 +841,14 @@ class BotControlPanel {
       const console = document.getElementById('console');
       console.innerHTML = `
         <div class="console-line info">
-          <span class="console-timestamp">[SYSTEM]</span>
+          <span class="console-timestamp">[${new Date().toLocaleTimeString()}]</span>
           <span>Logs cleared</span>
         </div>
       `;
-      this.showToast('🗑️ Logs cleared', 'success');
+      this.showToast('Logs cleared', 'success');
     } catch (error) {
       console.error('Error clearing logs:', error);
-      this.showToast('❌ Failed to clear logs', 'error');
+      this.showToast('Failed to clear logs', 'error');
     }
   }
 
@@ -565,7 +858,7 @@ class BotControlPanel {
     if (!logs || logs.length === 0) {
       console.innerHTML = `
         <div class="console-line info">
-          <span class="console-timestamp">[SYSTEM]</span>
+          <span class="console-timestamp">[${new Date().toLocaleTimeString()}]</span>
           <span>Waiting for logs...</span>
         </div>
       `;
@@ -692,7 +985,7 @@ class BotControlPanel {
            data-version="${version}" 
            onclick="botPanel.switchNodeVersion('${version}')">
         <div class="node-version-name">Node.js ${version}</div>
-        <div class="node-version-number">v${version}</div>
+        <div class="node-version-badge">${version === data.current ? 'Active' : 'Available'}</div>
       </div>
     `).join('');
   }
@@ -806,10 +1099,10 @@ class BotControlPanel {
     if (!container) return;
 
     const icons = {
-      success: '✅',
-      error: '❌',
-      warning: '⚠️',
-      info: 'ℹ️'
+      success: '<i class="fas fa-check-circle"></i>',
+      error: '<i class="fas fa-times-circle"></i>',
+      warning: '<i class="fas fa-exclamation-triangle"></i>',
+      info: '<i class="fas fa-info-circle"></i>'
     };
 
     const toast = document.createElement('div');
@@ -817,13 +1110,17 @@ class BotControlPanel {
     toast.innerHTML = `
       <div class="toast-icon">${icons[type] || icons.info}</div>
       <div class="toast-content">${message}</div>
+      <button class="toast-close"><i class="fas fa-times"></i></button>
     `;
 
     container.appendChild(toast);
 
+    const closeBtn = toast.querySelector('.toast-close');
+    closeBtn.addEventListener('click', () => toast.remove());
+
     setTimeout(() => {
       toast.remove();
-    }, 3000);
+    }, 4000);
   }
 }
 
@@ -832,8 +1129,8 @@ let botPanel;
 
 document.addEventListener('DOMContentLoaded', () => {
   botPanel = new BotControlPanel();
-  console.log('%c🤖 Bot Control Panel v1.0', 'color: #5865f2; font-size: 16px; font-weight: bold;');
-  console.log('%cManual ZIP Extract + Better Delete', 'color: #43b581;');
+  console.log('%c🤖 Bot Control Panel v2.0', 'color: #5865f2; font-size: 16px; font-weight: bold;');
+  console.log('%c✨ Enhanced with File Editor & Create File/Folder', 'color: #43b581;');
 });
 
 window.addEventListener('beforeunload', () => {
