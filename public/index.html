@@ -206,40 +206,31 @@
         <div class="card">
           <div class="card-header">
             <div class="card-title">
-              <span class="card-title-icon"><i class="fas fa-upload"></i></span>
-              <span>Upload Files</span>
-            </div>
-          </div>
-          <div class="card-body">
-            <div class="upload-zone" id="uploadZone">
-              <input type="file" id="fileInput" style="display: none;" accept="*" multiple />
-              <div class="upload-icon"><i class="fas fa-cloud-upload-alt"></i></div>
-              <div class="upload-text">Drag and drop files here or click to browse</div>
-              <div class="upload-hint">Supports ALL file types • Max: 100MB per file</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Files List Card -->
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">
               <span class="card-title-icon"><i class="fas fa-folder-open"></i></span>
-              <span>Uploaded Files</span>
+              <span>File Manager</span>
             </div>
-            <div style="display: flex; align-items: center; gap: 12px;">
-              <button id="createFileBtn" class="create-file-btn">
+            <div style="display: flex; gap: 12px;">
+              <button id="uploadBtn" class="btn btn-primary btn-sm">
+                <i class="fas fa-upload"></i>
+                <span>Upload Files</span>
+              </button>
+              <button id="createFileBtn" class="create-file-btn btn-sm">
                 <i class="fas fa-plus"></i>
                 <span>Create New</span>
               </button>
-              <span class="stat-description">Total: <strong id="totalFiles">0</strong></span>
             </div>
           </div>
           <div class="card-body">
+            <input type="file" id="fileInput" style="display: none;" accept="*" multiple />
+            <div style="margin-bottom: 12px; color: var(--text-muted); font-size: 13px;">
+              <i class="fas fa-info-circle"></i> Click "Upload Files" to select files • Max: 100MB per file • All types supported
+            </div>
+            <div style="padding: 16px; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-primary);">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                <span style="font-weight: 600; color: var(--text-primary);">Files & Folders</span>
+                <span class="stat-description">Total: <strong id="totalFiles">0</strong></span>
+              </div>
             <div class="file-list" id="fileList">
-              <div style="text-align: center; color: var(--text-muted); padding: 40px;">
-                <div style="font-size: 48px; margin-bottom: 16px;"><i class="fas fa-box-open"></i></div>
-                <div>No files uploaded yet</div>
               </div>
             </div>
           </div>
