@@ -449,7 +449,7 @@ body::before {
   padding: 24px;
 }
 
-/* PTERODACTYL-STYLE CONSOLE */
+/* PTERODACTYL-STYLE CONSOLE - FIXED LEFT ALIGN */
 .console-wrapper {
   position: relative;
   border-radius: 8px;
@@ -498,6 +498,7 @@ body::before {
   color: #e5e7eb;
 }
 
+/* FIXED: Console Line - Left Aligned */
 .console-line {
   margin-bottom: 4px;
   white-space: pre-wrap;
@@ -508,6 +509,7 @@ body::before {
   padding: 4px 8px;
   border-radius: 4px;
   transition: background 0.15s ease;
+  text-align: left;
 }
 
 .console-line:hover {
@@ -520,6 +522,14 @@ body::before {
   min-width: 90px;
   font-size: 12px;
   flex-shrink: 0;
+  text-align: left;
+}
+
+/* FIXED: Console message text - Left aligned */
+.console-line > span:last-child {
+  flex: 1;
+  text-align: left;
+  word-wrap: break-word;
 }
 
 .console-line.info {
@@ -556,7 +566,6 @@ body::before {
   color: #f59e0b;
 }
 
-/* Auto-scroll indicator */
 .console::after {
   content: '';
   display: block;
@@ -584,6 +593,11 @@ body::before {
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 12px;
 }
 
 .btn-primary {
@@ -753,6 +767,7 @@ body::before {
 .file-actions {
   display: flex;
   gap: 8px;
+  align-items: center;
 }
 
 .icon-btn {
@@ -773,6 +788,78 @@ body::before {
   background: var(--danger);
   color: white;
   transform: scale(1.1);
+}
+
+/* MODERN CONFIRMATION DIALOG */
+.confirm-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.confirm-dialog {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-primary);
+  border-radius: 12px;
+  width: 90%;
+  max-width: 420px;
+  box-shadow: var(--shadow-xl);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.confirm-dialog-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.confirm-dialog-header h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.confirm-dialog-body {
+  padding: 20px 24px;
+}
+
+.confirm-dialog-body p {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.confirm-dialog-footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--border-primary);
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
 }
 
 /* Toast */
@@ -980,5 +1067,13 @@ body::before {
   
   .node-versions-grid {
     grid-template-columns: 1fr;
+  }
+  
+  .file-actions {
+    flex-direction: column;
+  }
+  
+  .confirm-dialog {
+    width: 95%;
   }
 }
