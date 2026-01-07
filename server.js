@@ -192,27 +192,33 @@ const extractZipFile = async (zipPath, extractDir) => {
       const zipEntries = zip.getEntries();
       
       let extractedCount = 0;
+      let folderCount = 0;
       const extractedFiles = [];
       
       if (!fs.existsSync(extractDir)) {
         fs.mkdirSync(extractDir, { recursive: true });
       }
       
+      // First, create all directories
       for (const entry of zipEntries) {
-        try {
-          // Skip macOS metadata files only
-          if (entry.entryName.includes('__MACOSX')) {
-            continue;
-          }
-          
+        if (entry.isDirectory) {
           const entryPath = path.join(extractDir, entry.entryName);
-          
-          if (entry.isDirectory) {
-            if (!fs.existsSync(entryPath)) {
-              fs.mkdirSync(entryPath, { recursive: true });
-            }
-          } else {
+          if (!fs.existsSync(entryPath)) {
+            fs.mkdirSync(entryPath, { recursive: true });
+            folderCount++;
+            addLog(`Created folder: ${entry.entryName}`, 'info');
+          }
+        }
+      }
+      
+      // Then, extract all files
+      for (const entry of zipEntries) {
+        if (!entry.isDirectory) {
+          try {
+            const entryPath = path.join(extractDir, entry.entryName);
             const parentDir = path.dirname(entryPath);
+            
+            // Ensure parent directory exists
             if (!fs.existsSync(parentDir)) {
               fs.mkdirSync(parentDir, { recursive: true });
             }
@@ -223,16 +229,17 @@ const extractZipFile = async (zipPath, extractDir) => {
             extractedCount++;
             extractedFiles.push(entry.entryName);
             addLog(`Extracted: ${entry.entryName}`, 'info');
+          } catch (err) {
+            addLog(`Warning: Could not extract ${entry.entryName}: ${err.message}`, 'warning');
           }
-        } catch (err) {
-          addLog(`Warning: Could not extract ${entry.entryName}: ${err.message}`, 'warning');
         }
       }
       
-      addLog(`Extraction complete: ${extractedCount} files extracted`, 'success');
+      addLog(`Extraction complete: ${extractedCount} files, ${folderCount} folders`, 'success');
       
       resolve({ 
         extractedCount, 
+        folderCount,
         total: zipEntries.length,
         files: extractedFiles
       });
@@ -365,20 +372,52 @@ app.get('/api/files', (req, res) => {
   }
   
   try {
-    const files = fs.readdirSync(dir)
-      .filter(filename => !filename.startsWith('.'))
-      .map(filename => {
-        const filepath = path.join(dir, filename);
-        const stats = fs.statSync(filepath);
-        return {
-          name: filename,
-          size: stats.size,
-          type: path.extname(filename),
-          modified: stats.mtime,
-          isDirectory: stats.isDirectory()
-        };
-      })
-      .sort((a, b) => b.modified - a.modified);
+    // Fungsi rekursif untuk membaca semua file dan folder
+    const readDirRecursive = (dirPath, basePath = '') => {
+      const items = fs.readdirSync(dirPath);
+      const results = [];
+      
+      for (const item of items) {
+        const itemPath = path.join(dirPath, item);
+        const relativePath = basePath ? path.join(basePath, item) : item;
+        const stats = fs.statSync(itemPath);
+        
+        if (stats.isDirectory()) {
+          // Tambahkan folder
+          results.push({
+            name: relativePath,
+            originalName: item,
+            size: stats.size,
+            type: 'folder',
+            modified: stats.mtime,
+            isDirectory: true,
+            items: readDirRecursive(itemPath, relativePath) // Sub items
+          });
+        } else {
+          // Tambahkan file
+          const ext = path.extname(item).toLowerCase();
+          results.push({
+            name: relativePath,
+            originalName: item,
+            size: stats.size,
+            type: ext || 'file',
+            modified: stats.mtime,
+            isDirectory: false
+          });
+        }
+      }
+      
+      return results;
+    };
+    
+    const files = readDirRecursive(dir);
+    
+    // Sort: folders first, then files
+    files.sort((a, b) => {
+      if (a.isDirectory && !b.isDirectory) return -1;
+      if (!a.isDirectory && b.isDirectory) return 1;
+      return b.modified - a.modified;
+    });
     
     res.json(files);
   } catch (error) {
@@ -826,11 +865,14 @@ app.delete('/api/files/:filename', (req, res) => {
   const filename = req.params.filename;
   const username = req.session.username;
   
-  if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+  // Decode filename jika ada URL encoding
+  const decodedFilename = decodeURIComponent(filename);
+  
+  if (decodedFilename.includes('..') || decodedFilename.includes('/') || decodedFilename.includes('\\')) {
     return res.status(400).json({ error: 'Invalid filename' });
   }
   
-  const filepath = path.join('./bot_files', filename);
+  const filepath = path.join('./bot_files', decodedFilename);
   
   if (!fs.existsSync(filepath)) {
     return res.status(404).json({ error: 'File not found' });
@@ -844,20 +886,23 @@ app.delete('/api/files/:filename', (req, res) => {
     const stats = fs.statSync(filepath);
     
     if (stats.isDirectory()) {
+      // Delete directory recursively
       fs.rmSync(filepath, { recursive: true, force: true });
-      addLog(`Directory deleted: ${filename}`, 'warning', username);
+      addLog(`Directory deleted: ${decodedFilename}`, 'warning', username);
     } else {
+      // Delete file
       fs.unlinkSync(filepath);
-      addLog(`File deleted: ${filename}`, 'warning', username);
+      addLog(`File deleted: ${decodedFilename}`, 'warning', username);
     }
     
     res.json({ 
-      message: 'File deleted successfully',
-      filename: filename
+      message: 'File/directory deleted successfully',
+      filename: decodedFilename,
+      isDirectory: stats.isDirectory()
     });
   } catch (error) {
-    addLog(`Error deleting file ${filename}: ${error.message}`, 'error', username);
-    res.status(500).json({ error: 'Failed to delete file' });
+    addLog(`Error deleting ${decodedFilename}: ${error.message}`, 'error', username);
+    res.status(500).json({ error: `Failed to delete: ${error.message}` });
   }
 });
 
