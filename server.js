@@ -69,7 +69,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Storage setup
+// Storage setup - REMOVED ALL FILE RESTRICTIONS
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const dir = './bot_files';
@@ -84,23 +84,16 @@ const storage = multer.diskStorage({
   }
 });
 
-// File filter - REMOVED ZIP RESTRICTION
+// File filter - ALLOW ALL FILES
 const fileFilter = (req, file, cb) => {
-  const allowedExtensions = ['.js', '.json', '.txt', '.env', '.md', '.zip'];
-  const ext = path.extname(file.originalname).toLowerCase();
-  
-  if (allowedExtensions.includes(ext)) {
-    cb(null, true);
-  } else {
-    cb(new Error(`Invalid file type: ${ext}. Allowed: ${allowedExtensions.join(', ')}`));
-  }
+  cb(null, true); // Accept all files
 };
 
 const upload = multer({ 
   storage,
   fileFilter,
   limits: {
-    fileSize: 20 * 1024 * 1024,
+    fileSize: 100 * 1024 * 1024, // 100MB
     files: 10
   }
 });
@@ -114,15 +107,10 @@ let isInstalling = false;
 let botStartTime = null;
 let uptime = 0;
 let uptimeInterval = null;
-let selectedNodeVersion = process.env.DEFAULT_NODE_VERSION || '18.17.0';
+let selectedNodeVersion = process.env.DEFAULT_NODE_VERSION || '18';
 
-// Available Node.js versions
-const AVAILABLE_NODE_VERSIONS = [
-  '18.17.0',
-  '19.9.0', 
-  '20.5.0',
-  '21.0.0'
-];
+// Available Node.js versions - SIMPLIFIED
+const AVAILABLE_NODE_VERSIONS = ['18', '19', '20', '21'];
 
 // Helper functions
 const addLog = (message, type = 'info', username = 'system') => {
@@ -195,7 +183,7 @@ const validateBotToken = (token) => {
   return true;
 };
 
-// MANUAL ZIP EXTRACTION FUNCTION
+// IMPROVED ZIP EXTRACTION - NO RESTRICTIONS
 const extractZipFile = async (zipPath, extractDir) => {
   return new Promise(async (resolve, reject) => {
     try {
@@ -204,7 +192,6 @@ const extractZipFile = async (zipPath, extractDir) => {
       const zipEntries = zip.getEntries();
       
       let extractedCount = 0;
-      let skippedCount = 0;
       const extractedFiles = [];
       
       if (!fs.existsSync(extractDir)) {
@@ -213,18 +200,12 @@ const extractZipFile = async (zipPath, extractDir) => {
       
       for (const entry of zipEntries) {
         try {
-          if (entry.entryName.includes('__MACOSX') || entry.entryName.startsWith('.')) {
-            skippedCount++;
+          // Skip macOS metadata files only
+          if (entry.entryName.includes('__MACOSX')) {
             continue;
           }
           
           const entryPath = path.join(extractDir, entry.entryName);
-          
-          if (!entryPath.startsWith(path.resolve(extractDir))) {
-            skippedCount++;
-            addLog(`Skipped dangerous path: ${entry.entryName}`, 'warning');
-            continue;
-          }
           
           if (entry.isDirectory) {
             if (!fs.existsSync(entryPath)) {
@@ -244,16 +225,14 @@ const extractZipFile = async (zipPath, extractDir) => {
             addLog(`Extracted: ${entry.entryName}`, 'info');
           }
         } catch (err) {
-          skippedCount++;
           addLog(`Warning: Could not extract ${entry.entryName}: ${err.message}`, 'warning');
         }
       }
       
-      addLog(`Extraction complete: ${extractedCount} files extracted, ${skippedCount} skipped`, 'success');
+      addLog(`Extraction complete: ${extractedCount} files extracted`, 'success');
       
       resolve({ 
         extractedCount, 
-        skippedCount, 
         total: zipEntries.length,
         files: extractedFiles
       });
@@ -344,7 +323,7 @@ app.get('/api/system/node-versions', (req, res) => {
   res.json({
     current: selectedNodeVersion,
     available: AVAILABLE_NODE_VERSIONS,
-    default: process.env.DEFAULT_NODE_VERSION || '18.17.0'
+    default: process.env.DEFAULT_NODE_VERSION || '18'
   });
 });
 
@@ -366,11 +345,11 @@ app.post('/api/system/switch-node', async (req, res) => {
   
   try {
     selectedNodeVersion = version;
-    addLog(`Switched Node.js to ${version}`, 'success', username);
+    addLog(`Switched Node.js to version ${version}`, 'success', username);
     
     res.json({ 
       success: true, 
-      message: `Node.js switched to ${version}`,
+      message: `Node.js switched to version ${version}`,
       version: version
     });
   } catch (error) {
@@ -408,12 +387,12 @@ app.get('/api/files', (req, res) => {
   }
 });
 
-// UPLOAD ROUTE - ZIP TIDAK AUTO EXTRACT
+// UPLOAD ROUTE - ACCEPT ALL FILES
 app.post('/api/upload', async (req, res) => {
   upload.single('file')(req, res, async (err) => {
     if (err instanceof multer.MulterError) {
       if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(400).json({ error: 'File too large. Maximum size is 20MB' });
+        return res.status(400).json({ error: 'File too large. Maximum size is 100MB' });
       }
       return res.status(400).json({ error: `Upload error: ${err.message}` });
     } else if (err) {
@@ -445,7 +424,7 @@ app.post('/api/upload', async (req, res) => {
   });
 });
 
-// NEW ROUTE: MANUAL ZIP EXTRACTION
+// MANUAL ZIP EXTRACTION
 app.post('/api/extract-zip/:filename', async (req, res) => {
   const filename = req.params.filename;
   const username = req.session.username;
@@ -484,12 +463,128 @@ app.post('/api/extract-zip/:filename', async (req, res) => {
       success: true,
       message: 'ZIP extracted successfully',
       extractedCount: result.extractedCount,
-      skippedCount: result.skippedCount,
       files: result.files
     });
   } catch (error) {
     addLog(`Failed to extract ZIP: ${error.message}`, 'error', username);
     res.status(500).json({ error: `Failed to extract ZIP: ${error.message}` });
+  }
+});
+
+// NEW: READ FILE CONTENT
+app.get('/api/files/:filename/content', (req, res) => {
+  const filename = req.params.filename;
+  const username = req.session.username;
+  
+  if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+    return res.status(400).json({ error: 'Invalid filename' });
+  }
+  
+  const filepath = path.join('./bot_files', filename);
+  
+  if (!fs.existsSync(filepath)) {
+    return res.status(404).json({ error: 'File not found' });
+  }
+  
+  try {
+    const stats = fs.statSync(filepath);
+    
+    if (stats.isDirectory()) {
+      return res.status(400).json({ error: 'Cannot read directory content' });
+    }
+    
+    const content = fs.readFileSync(filepath, 'utf8');
+    addLog(`File read: ${filename}`, 'info', username);
+    
+    res.json({ 
+      success: true,
+      filename: filename,
+      content: content,
+      size: stats.size
+    });
+  } catch (error) {
+    addLog(`Error reading file ${filename}: ${error.message}`, 'error', username);
+    res.status(500).json({ error: 'Failed to read file' });
+  }
+});
+
+// NEW: UPDATE FILE CONTENT
+app.put('/api/files/:filename/content', (req, res) => {
+  const filename = req.params.filename;
+  const { content } = req.body;
+  const username = req.session.username;
+  
+  if (!content && content !== '') {
+    return res.status(400).json({ error: 'Content is required' });
+  }
+  
+  if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+    return res.status(400).json({ error: 'Invalid filename' });
+  }
+  
+  const filepath = path.join('./bot_files', filename);
+  
+  if (!fs.existsSync(filepath)) {
+    return res.status(404).json({ error: 'File not found' });
+  }
+  
+  try {
+    fs.writeFileSync(filepath, content, 'utf8');
+    addLog(`File updated: ${filename}`, 'success', username);
+    
+    res.json({ 
+      success: true,
+      message: 'File updated successfully',
+      filename: filename
+    });
+  } catch (error) {
+    addLog(`Error updating file ${filename}: ${error.message}`, 'error', username);
+    res.status(500).json({ error: 'Failed to update file' });
+  }
+});
+
+// NEW: CREATE FILE
+app.post('/api/files/create', (req, res) => {
+  const { filename, content, isFolder } = req.body;
+  const username = req.session.username;
+  
+  if (!filename) {
+    return res.status(400).json({ error: 'Filename is required' });
+  }
+  
+  if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+    return res.status(400).json({ error: 'Invalid filename' });
+  }
+  
+  const filepath = path.join('./bot_files', filename);
+  
+  if (fs.existsSync(filepath)) {
+    return res.status(400).json({ error: 'File or folder already exists' });
+  }
+  
+  try {
+    if (isFolder) {
+      fs.mkdirSync(filepath, { recursive: true });
+      addLog(`Folder created: ${filename}`, 'success', username);
+      res.json({ 
+        success: true,
+        message: 'Folder created successfully',
+        filename: filename,
+        isFolder: true
+      });
+    } else {
+      fs.writeFileSync(filepath, content || '', 'utf8');
+      addLog(`File created: ${filename}`, 'success', username);
+      res.json({ 
+        success: true,
+        message: 'File created successfully',
+        filename: filename,
+        isFolder: false
+      });
+    }
+  } catch (error) {
+    addLog(`Error creating ${isFolder ? 'folder' : 'file'} ${filename}: ${error.message}`, 'error', username);
+    res.status(500).json({ error: `Failed to create ${isFolder ? 'folder' : 'file'}` });
   }
 });
 
@@ -842,13 +937,14 @@ process.on('unhandledRejection', (reason, promise) => {
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ============================================
-  🤖 Discord Bot Control Panel v1.0
+  🤖 Discord Bot Control Panel v2.0
   ============================================
   ✅ Server running on port ${PORT}
   ✅ Authentication: Enabled
   ✅ Manual ZIP Extraction: Enabled
+  ✅ File Editor: Enabled
+  ✅ Create File/Folder: Enabled
   ✅ Multi-Node Version: Enabled
-  ✅ Memory Monitoring: Enabled
   
   🔐 Login required: Yes
   👤 Default username: ${USERNAME}
