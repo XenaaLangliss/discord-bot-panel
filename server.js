@@ -69,7 +69,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Storage setup - FIXED: Tidak menambahkan username ke nama file
+// Storage setup
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const dir = './bot_files';
@@ -79,13 +79,12 @@ const storage = multer.diskStorage({
     cb(null, dir);
   },
   filename: (req, file, cb) => {
-    // FIXED: Hanya sanitize nama file, tidak menambahkan username
     const sanitized = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
     cb(null, sanitized);
   }
 });
 
-// File filter
+// File filter - REMOVED ZIP RESTRICTION
 const fileFilter = (req, file, cb) => {
   const allowedExtensions = ['.js', '.json', '.txt', '.env', '.md', '.zip'];
   const ext = path.extname(file.originalname).toLowerCase();
@@ -196,7 +195,7 @@ const validateBotToken = (token) => {
   return true;
 };
 
-// FIXED: ZIP Extraction function - Perbaikan ekstraksi ZIP
+// MANUAL ZIP EXTRACTION FUNCTION
 const extractZipFile = async (zipPath, extractDir) => {
   return new Promise(async (resolve, reject) => {
     try {
@@ -208,23 +207,19 @@ const extractZipFile = async (zipPath, extractDir) => {
       let skippedCount = 0;
       const extractedFiles = [];
       
-      // Pastikan directory tujuan ada
       if (!fs.existsSync(extractDir)) {
         fs.mkdirSync(extractDir, { recursive: true });
       }
       
       for (const entry of zipEntries) {
         try {
-          // Skip __MACOSX dan hidden files
           if (entry.entryName.includes('__MACOSX') || entry.entryName.startsWith('.')) {
             skippedCount++;
             continue;
           }
           
-          // Dapatkan path lengkap
           const entryPath = path.join(extractDir, entry.entryName);
           
-          // Security check
           if (!entryPath.startsWith(path.resolve(extractDir))) {
             skippedCount++;
             addLog(`Skipped dangerous path: ${entry.entryName}`, 'warning');
@@ -232,18 +227,15 @@ const extractZipFile = async (zipPath, extractDir) => {
           }
           
           if (entry.isDirectory) {
-            // Buat direktori jika belum ada
             if (!fs.existsSync(entryPath)) {
               fs.mkdirSync(entryPath, { recursive: true });
             }
           } else {
-            // Pastikan parent directory ada
             const parentDir = path.dirname(entryPath);
             if (!fs.existsSync(parentDir)) {
               fs.mkdirSync(parentDir, { recursive: true });
             }
             
-            // Extract file
             const content = entry.getData();
             fs.writeFileSync(entryPath, content);
             
@@ -255,13 +247,6 @@ const extractZipFile = async (zipPath, extractDir) => {
           skippedCount++;
           addLog(`Warning: Could not extract ${entry.entryName}: ${err.message}`, 'warning');
         }
-      }
-      
-      // Hapus file ZIP setelah ekstraksi
-      try {
-        fs.unlinkSync(zipPath);
-      } catch (err) {
-        addLog(`Warning: Could not delete ZIP file: ${err.message}`, 'warning');
       }
       
       addLog(`Extraction complete: ${extractedCount} files extracted, ${skippedCount} skipped`, 'success');
@@ -423,6 +408,7 @@ app.get('/api/files', (req, res) => {
   }
 });
 
+// UPLOAD ROUTE - ZIP TIDAK AUTO EXTRACT
 app.post('/api/upload', async (req, res) => {
   upload.single('file')(req, res, async (err) => {
     if (err instanceof multer.MulterError) {
@@ -442,36 +428,69 @@ app.post('/api/upload', async (req, res) => {
     const username = req.session.username;
     
     try {
-      if (fileExt === '.zip') {
-        addLog(`Extracting ZIP file: ${req.file.originalname}`, 'info', username);
-        
-        const result = await extractZipFile(req.file.path, './bot_files');
-        
-        addLog(`ZIP extracted: ${req.file.originalname} (${result.extractedCount} files)`, 'success', username);
-        
-        res.json({ 
-          message: 'ZIP file extracted successfully',
-          filename: req.file.originalname,
-          extractedCount: result.extractedCount,
-          extractedFiles: result.files,
-          type: 'zip'
-        });
-      } else {
-        const fileSizeKB = (req.file.size / 1024).toFixed(2);
-        addLog(`File uploaded: ${req.file.originalname} (${fileSizeKB} KB)`, 'success', username);
-        
-        res.json({ 
-          message: 'File uploaded successfully',
-          filename: req.file.filename,
-          size: req.file.size,
-          type: 'file'
-        });
-      }
+      const fileSizeKB = (req.file.size / 1024).toFixed(2);
+      addLog(`File uploaded: ${req.file.originalname} (${fileSizeKB} KB)`, 'success', username);
+      
+      res.json({ 
+        message: 'File uploaded successfully',
+        filename: req.file.filename,
+        size: req.file.size,
+        type: fileExt === '.zip' ? 'zip' : 'file',
+        isZip: fileExt === '.zip'
+      });
     } catch (error) {
       addLog(`Error processing file: ${error.message}`, 'error', username);
       res.status(500).json({ error: `Failed to process file: ${error.message}` });
     }
   });
+});
+
+// NEW ROUTE: MANUAL ZIP EXTRACTION
+app.post('/api/extract-zip/:filename', async (req, res) => {
+  const filename = req.params.filename;
+  const username = req.session.username;
+  
+  if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+    return res.status(400).json({ error: 'Invalid filename' });
+  }
+  
+  const zipPath = path.join('./bot_files', filename);
+  
+  if (!fs.existsSync(zipPath)) {
+    return res.status(404).json({ error: 'ZIP file not found' });
+  }
+  
+  const ext = path.extname(filename).toLowerCase();
+  if (ext !== '.zip') {
+    return res.status(400).json({ error: 'File is not a ZIP archive' });
+  }
+  
+  try {
+    addLog(`Extracting ZIP: ${filename}`, 'info', username);
+    
+    const result = await extractZipFile(zipPath, './bot_files');
+    
+    // Delete ZIP after extraction
+    try {
+      fs.unlinkSync(zipPath);
+      addLog(`Deleted ZIP file: ${filename}`, 'info', username);
+    } catch (err) {
+      addLog(`Warning: Could not delete ZIP: ${err.message}`, 'warning', username);
+    }
+    
+    addLog(`ZIP extracted successfully: ${result.extractedCount} files`, 'success', username);
+    
+    res.json({
+      success: true,
+      message: 'ZIP extracted successfully',
+      extractedCount: result.extractedCount,
+      skippedCount: result.skippedCount,
+      files: result.files
+    });
+  } catch (error) {
+    addLog(`Failed to extract ZIP: ${error.message}`, 'error', username);
+    res.status(500).json({ error: `Failed to extract ZIP: ${error.message}` });
+  }
 });
 
 app.post('/api/token', (req, res) => {
@@ -708,7 +727,6 @@ app.post('/api/stop', (req, res) => {
   }
 });
 
-// FIXED: Delete file untuk semua tipe file
 app.delete('/api/files/:filename', (req, res) => {
   const filename = req.params.filename;
   const username = req.session.username;
@@ -723,7 +741,6 @@ app.delete('/api/files/:filename', (req, res) => {
     return res.status(404).json({ error: 'File not found' });
   }
   
-  // Cek apakah bot sedang running
   if (botStatus === 'running') {
     return res.status(400).json({ error: 'Cannot delete files while bot is running. Please stop the bot first.' });
   }
@@ -776,7 +793,6 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Serve main panel
 app.get('/', (req, res) => {
   if (!req.session.authenticated) {
     return res.redirect('/login');
@@ -784,7 +800,6 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// 404 handler
 app.use((req, res) => {
   res.status(404).json({ 
     error: 'Not found',
@@ -792,7 +807,6 @@ app.use((req, res) => {
   });
 });
 
-// Error handler
 app.use((err, req, res, next) => {
   console.error('Server error:', err);
   addLog(`Server error: ${err.message}`, 'error');
@@ -803,7 +817,6 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Cleanup on exit
 process.on('SIGTERM', () => {
   console.log('Received SIGTERM, cleaning up...');
   stopBot();
@@ -826,7 +839,6 @@ process.on('unhandledRejection', (reason, promise) => {
   addLog(`Unhandled Rejection: ${reason}`, 'error');
 });
 
-// Start server
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ============================================
@@ -834,10 +846,9 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   ============================================
   ✅ Server running on port ${PORT}
   ✅ Authentication: Enabled
-  ✅ ZIP Extraction Support: Enabled
+  ✅ Manual ZIP Extraction: Enabled
   ✅ Multi-Node Version: Enabled
   ✅ Memory Monitoring: Enabled
-  ✅ Uptime Persistence: Enabled
   
   🔐 Login required: Yes
   👤 Default username: ${USERNAME}
