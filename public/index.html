@@ -188,7 +188,7 @@
             <div class="console" id="console">
               <div class="console-line info">
                 <span class="console-timestamp">[SYSTEM]</span>
-                Bot Control Panel v1.0 - Waiting for bot to start...
+                Bot Control Panel v2.0 - Waiting for bot to start...
               </div>
             </div>
           </div>
@@ -212,10 +212,10 @@
           </div>
           <div class="card-body">
             <div class="upload-zone" id="uploadZone">
-              <input type="file" id="fileInput" style="display: none;" accept=".js,.json,.txt,.env,.md,.zip" multiple />
+              <input type="file" id="fileInput" style="display: none;" accept="*" multiple />
               <div class="upload-icon"><i class="fas fa-cloud-upload-alt"></i></div>
               <div class="upload-text">Drag and drop files here or click to browse</div>
-              <div class="upload-hint">Supported: .js, .json, .txt, .env, .md, .zip (Max 20MB)</div>
+              <div class="upload-hint">Supports ALL file types • Max: 100MB per file</div>
             </div>
           </div>
         </div>
@@ -228,7 +228,11 @@
               <span>Uploaded Files</span>
             </div>
             <div>
-              <span class="stat-description">Total: <strong id="totalFiles">0</strong></span>
+              <button id="createFileBtn" class="create-file-btn">
+                <i class="fas fa-plus"></i>
+                <span>Create File/Folder</span>
+              </button>
+              <span class="stat-description" style="margin-left: 12px;">Total: <strong id="totalFiles">0</strong></span>
             </div>
           </div>
           <div class="card-body">
@@ -307,6 +311,16 @@
                   4. Monitor logs in real-time
                 </div>
               </div>
+              <div>
+                <div class="form-label">New Features</div>
+                <div style="color: var(--text-secondary); line-height: 1.8;">
+                  <i class="fas fa-check-circle" style="color: var(--success);"></i> File Editor (Edit .js, .json, .txt, etc)<br>
+                  <i class="fas fa-check-circle" style="color: var(--success);"></i> Create Files/Folders<br>
+                  <i class="fas fa-check-circle" style="color: var(--success);"></i> ZIP Extraction<br>
+                  <i class="fas fa-check-circle" style="color: var(--success);"></i> Copy File Path<br>
+                  <i class="fas fa-check-circle" style="color: var(--success);"></i> Multi-Node.js Version Support
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -337,7 +351,7 @@
             <div class="form-group">
               <label class="form-label">Select Node.js Version</label>
               <div class="node-versions-grid" id="nodeVersionsGrid">
-                <!-- Versi akan diisi oleh JavaScript -->
+                <!-- Versions will be filled by JavaScript -->
               </div>
             </div>
 
@@ -380,9 +394,14 @@
                   <i class="fas fa-upload"></i> 2. Upload Your Bot Files
                 </h3>
                 <p style="color: var(--text-secondary); line-height: 1.8;">
-                  Go to the File Manager and upload your bot's JavaScript files. Make sure you have a main file
-                  (index.js, bot.js, main.js, or app.js) and a package.json if you use any dependencies.
+                  Go to the File Manager and upload your bot's files. You can:
                 </p>
+                <ul style="color: var(--text-secondary); line-height: 1.8; margin-left: 20px;">
+                  <li>Upload any file type (100MB max)</li>
+                  <li>Upload ZIP files and extract them</li>
+                  <li>Create new files and folders directly</li>
+                  <li>Edit files with built-in editor</li>
+                </ul>
               </div>
               
               <div>
@@ -413,6 +432,22 @@
                   You can select different Node.js versions (18-21) from the Node Version page.
                   This is useful if your bot requires a specific Node.js version.
                 </p>
+              </div>
+
+              <div>
+                <h3 style="color: var(--accent-primary); margin-bottom: 8px;">
+                  <i class="fas fa-edit"></i> 6. File Management
+                </h3>
+                <p style="color: var(--text-secondary); line-height: 1.8;">
+                  <strong>New in v2.0:</strong> Click the three-dot menu on any file to:
+                </p>
+                <ul style="color: var(--text-secondary); line-height: 1.8; margin-left: 20px;">
+                  <li><strong>Edit:</strong> Edit text files in browser</li>
+                  <li><strong>Extract:</strong> Extract ZIP files automatically</li>
+                  <li><strong>Copy Path:</strong> Copy file path to clipboard</li>
+                  <li><strong>Delete:</strong> Remove files/folders</li>
+                  <li><strong>Create New:</strong> Create files/folders with button</li>
+                </ul>
               </div>
             </div>
           </div>
