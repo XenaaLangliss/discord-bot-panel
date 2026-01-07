@@ -823,7 +823,7 @@ body::before {
   box-shadow: var(--shadow-xl);
   min-width: 180px;
   z-index: 1000;
-  overflow: hidden;
+  overflow: visible;
   display: none;
 }
 
@@ -832,31 +832,37 @@ body::before {
   animation: slideDown 0.2s ease;
 }
 
-/* MOBILE FIX: Menu appears above on mobile */
+/* MOBILE FIX: Menu position better on mobile */
 @media (max-width: 768px) {
   .file-menu {
     position: fixed;
-    right: auto;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    min-width: 240px;
-    max-width: 90vw;
+    right: 20px;
+    top: auto;
+    bottom: 50%;
+    transform: translateY(50%);
+    min-width: 200px;
+    max-width: calc(100vw - 40px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
   }
   
   .file-menu.active {
-    animation: scaleIn 0.2s ease;
+    animation: slideInRight 0.2s ease;
   }
   
-  @keyframes scaleIn {
+  @keyframes slideInRight {
     from {
       opacity: 0;
-      transform: translate(-50%, -50%) scale(0.9);
+      transform: translateY(50%) translateX(20px);
     }
     to {
       opacity: 1;
-      transform: translate(-50%, -50%) scale(1);
+      transform: translateY(50%) translateX(0);
     }
+  }
+  
+  .file-menu-item {
+    padding: 16px 20px;
+    font-size: 15px;
   }
 }
 
@@ -1398,6 +1404,29 @@ body::before {
   background: var(--accent-hover);
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(88, 101, 242, 0.4);
+}
+
+/* File Path Breadcrumb */
+.file-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  border: 1px solid var(--border-primary);
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.file-breadcrumb i {
+  color: var(--accent-primary);
+}
+
+.file-breadcrumb span {
+  color: var(--text-secondary);
 }
 
 .hidden { 
