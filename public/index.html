@@ -16,7 +16,7 @@
 </head>
 <body>
   <div class="app-wrapper">
-    <!-- Mobile Menu Toggle - OUTSIDE everything -->
+    <!-- Mobile Menu Toggle -->
     <button class="mobile-menu-btn" id="mobileMenuBtn">
       <i class="fas fa-bars hamburger-icon"></i>
       <i class="fas fa-times close-icon"></i>
@@ -187,8 +187,8 @@
             </div>
             <div class="console" id="console">
               <div class="console-line info">
-                <span class="console-timestamp">[SYSTEM]</span>
-                Bot Control Panel v2.0 - Waiting for bot to start...
+                <span class="console-timestamp">[00:00:00]</span>
+                <span>Bot Control Panel v2.0 - Waiting for bot to start...</span>
               </div>
             </div>
           </div>
@@ -227,12 +227,12 @@
               <span class="card-title-icon"><i class="fas fa-folder-open"></i></span>
               <span>Uploaded Files</span>
             </div>
-            <div>
+            <div style="display: flex; align-items: center; gap: 12px;">
               <button id="createFileBtn" class="create-file-btn">
                 <i class="fas fa-plus"></i>
-                <span>Create File/Folder</span>
+                <span>Create New</span>
               </button>
-              <span class="stat-description" style="margin-left: 12px;">Total: <strong id="totalFiles">0</strong></span>
+              <span class="stat-description">Total: <strong id="totalFiles">0</strong></span>
             </div>
           </div>
           <div class="card-body">
@@ -312,13 +312,14 @@
                 </div>
               </div>
               <div>
-                <div class="form-label">New Features</div>
+                <div class="form-label">✨ New Features v2.0</div>
                 <div style="color: var(--text-secondary); line-height: 1.8;">
                   <i class="fas fa-check-circle" style="color: var(--success);"></i> File Editor (Edit .js, .json, .txt, etc)<br>
                   <i class="fas fa-check-circle" style="color: var(--success);"></i> Create Files/Folders<br>
                   <i class="fas fa-check-circle" style="color: var(--success);"></i> ZIP Extraction<br>
                   <i class="fas fa-check-circle" style="color: var(--success);"></i> Copy File Path<br>
-                  <i class="fas fa-check-circle" style="color: var(--success);"></i> Multi-Node.js Version Support
+                  <i class="fas fa-check-circle" style="color: var(--success);"></i> Multi-Node.js Version Support<br>
+                  <i class="fas fa-check-circle" style="color: var(--success);"></i> No File Type Restrictions
                 </div>
               </div>
             </div>
@@ -429,25 +430,27 @@
                   <i class="fas fa-code-branch"></i> 5. Node.js Version
                 </h3>
                 <p style="color: var(--text-secondary); line-height: 1.8;">
-                  You can select different Node.js versions (18-21) from the Node Version page.
+                  You can select different Node.js versions (18, 19, 20, 21) from the Node Version page.
                   This is useful if your bot requires a specific Node.js version.
                 </p>
               </div>
 
               <div>
                 <h3 style="color: var(--accent-primary); margin-bottom: 8px;">
-                  <i class="fas fa-edit"></i> 6. File Management
+                  <i class="fas fa-edit"></i> 6. File Management (NEW!)
                 </h3>
                 <p style="color: var(--text-secondary); line-height: 1.8;">
-                  <strong>New in v2.0:</strong> Click the three-dot menu on any file to:
+                  <strong>New in v2.0:</strong> Click the three-dot menu (⋮) on any file to:
                 </p>
                 <ul style="color: var(--text-secondary); line-height: 1.8; margin-left: 20px;">
-                  <li><strong>Edit:</strong> Edit text files in browser</li>
+                  <li><strong>Edit:</strong> Edit text files directly in browser</li>
                   <li><strong>Extract:</strong> Extract ZIP files automatically</li>
                   <li><strong>Copy Path:</strong> Copy file path to clipboard</li>
                   <li><strong>Delete:</strong> Remove files/folders</li>
-                  <li><strong>Create New:</strong> Create files/folders with button</li>
                 </ul>
+                <p style="color: var(--text-secondary); line-height: 1.8; margin-top: 8px;">
+                  Use the <strong>"Create New"</strong> button to create files or folders instantly!
+                </p>
               </div>
             </div>
           </div>
