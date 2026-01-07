@@ -34,7 +34,6 @@ class BotControlPanel {
         return;
       }
       
-      // Update user badge
       const userBadge = document.getElementById('userBadge');
       if (userBadge && data.username) {
         userBadge.textContent = data.username;
@@ -289,8 +288,8 @@ class BotControlPanel {
       const data = await response.json();
 
       if (response.ok) {
-        if (fileExtension === '.zip') {
-          this.showToast(`✅ ZIP extracted: ${file.name} (${data.extractedCount || 0} files)`, 'success');
+        if (data.isZip) {
+          this.showToast(`📦 ZIP uploaded: ${file.name}`, 'success');
         } else {
           this.showToast(`✅ Uploaded: ${file.name}`, 'success');
         }
@@ -308,8 +307,40 @@ class BotControlPanel {
     }
   }
 
+  // MANUAL ZIP EXTRACTION
+  async extractZip(filename) {
+    try {
+      this.showToast('📦 Extracting ZIP...', 'info');
+      
+      const response = await fetch(`/api/extract-zip/${encodeURIComponent(filename)}`, {
+        method: 'POST'
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        this.showToast(`✅ Extracted ${data.extractedCount} files!`, 'success');
+        await this.updateFilesList();
+        await this.updateStatus();
+      } else {
+        this.showToast(`❌ ${data.error || 'Extraction failed'}`, 'error');
+      }
+    } catch (error) {
+      console.error('Error extracting ZIP:', error);
+      this.showToast('❌ Extraction failed. Please try again.', 'error');
+    }
+  }
+
   async deleteFile(filename) {
-    if (!confirm(`Delete ${filename}?`)) return;
+    // MODERN DELETE CONFIRMATION
+    const confirmDelete = await this.showConfirmDialog(
+      'Delete File',
+      `Are you sure you want to delete "${filename}"?`,
+      'Delete',
+      'Cancel'
+    );
+    
+    if (!confirmDelete) return;
 
     try {
       const response = await fetch(`/api/files/${encodeURIComponent(filename)}`, {
@@ -328,6 +359,54 @@ class BotControlPanel {
       console.error('Error deleting file:', error);
       this.showToast('❌ Delete failed. Please try again.', 'error');
     }
+  }
+
+  // MODERN CONFIRMATION DIALOG
+  showConfirmDialog(title, message, confirmText, cancelText) {
+    return new Promise((resolve) => {
+      const dialog = document.createElement('div');
+      dialog.className = 'confirm-dialog-overlay';
+      dialog.innerHTML = `
+        <div class="confirm-dialog">
+          <div class="confirm-dialog-header">
+            <h3>${this.escapeHtml(title)}</h3>
+          </div>
+          <div class="confirm-dialog-body">
+            <p>${this.escapeHtml(message)}</p>
+          </div>
+          <div class="confirm-dialog-footer">
+            <button class="btn btn-secondary" id="cancelBtn">${this.escapeHtml(cancelText)}</button>
+            <button class="btn btn-danger" id="confirmBtn">${this.escapeHtml(confirmText)}</button>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(dialog);
+      
+      const confirmBtn = dialog.querySelector('#confirmBtn');
+      const cancelBtn = dialog.querySelector('#cancelBtn');
+      
+      const cleanup = () => {
+        dialog.remove();
+      };
+      
+      confirmBtn.addEventListener('click', () => {
+        cleanup();
+        resolve(true);
+      });
+      
+      cancelBtn.addEventListener('click', () => {
+        cleanup();
+        resolve(false);
+      });
+      
+      dialog.addEventListener('click', (e) => {
+        if (e.target === dialog) {
+          cleanup();
+          resolve(false);
+        }
+      });
+    });
   }
 
   async updateFilesList() {
@@ -353,6 +432,8 @@ class BotControlPanel {
 
       fileList.innerHTML = files.map(file => {
         const icon = this.getFileIcon(file.name);
+        const isZip = file.type === '.zip';
+        
         return `
           <div class="file-item">
             <div class="file-icon">${icon}</div>
@@ -361,7 +442,12 @@ class BotControlPanel {
               <div class="file-meta">${this.formatFileSize(file.size)} • ${file.type || 'file'} • ${new Date(file.modified).toLocaleDateString()}</div>
             </div>
             <div class="file-actions">
-              <button class="icon-btn" onclick="botPanel.deleteFile('${this.escapeHtml(file.name)}')">
+              ${isZip ? `
+                <button class="btn btn-primary btn-sm" onclick="botPanel.extractZip('${this.escapeHtml(file.name)}')" title="Extract ZIP">
+                  <i class="fas fa-file-archive"></i> Extract
+                </button>
+              ` : ''}
+              <button class="icon-btn" onclick="botPanel.deleteFile('${this.escapeHtml(file.name)}')" title="Delete">
                 <i class="fas fa-trash"></i>
               </button>
             </div>
@@ -444,8 +530,16 @@ class BotControlPanel {
   }
 
   async killBot() {
-    if (!confirm('Force kill the bot? This may cause data loss.')) return;
-    await this.stopBot();
+    const confirmed = await this.showConfirmDialog(
+      'Force Kill Bot',
+      'Force kill the bot? This may cause data loss.',
+      'Force Kill',
+      'Cancel'
+    );
+    
+    if (confirmed) {
+      await this.stopBot();
+    }
   }
 
   async clearLogs() {
@@ -455,7 +549,7 @@ class BotControlPanel {
       console.innerHTML = `
         <div class="console-line info">
           <span class="console-timestamp">[SYSTEM]</span>
-          Logs cleared
+          <span>Logs cleared</span>
         </div>
       `;
       this.showToast('🗑️ Logs cleared', 'success');
@@ -472,7 +566,7 @@ class BotControlPanel {
       console.innerHTML = `
         <div class="console-line info">
           <span class="console-timestamp">[SYSTEM]</span>
-          Waiting for logs...
+          <span>Waiting for logs...</span>
         </div>
       `;
       return;
@@ -483,7 +577,7 @@ class BotControlPanel {
       return `
         <div class="console-line ${typeClass}">
           <span class="console-timestamp">[${log.timestamp}]</span>
-          ${this.escapeHtml(log.message)}
+          <span>${this.escapeHtml(log.message)}</span>
         </div>
       `;
     }).join('');
@@ -739,7 +833,7 @@ let botPanel;
 document.addEventListener('DOMContentLoaded', () => {
   botPanel = new BotControlPanel();
   console.log('%c🤖 Bot Control Panel v1.0', 'color: #5865f2; font-size: 16px; font-weight: bold;');
-  console.log('%cLogin System + Node Version Selector', 'color: #43b581;');
+  console.log('%cManual ZIP Extract + Better Delete', 'color: #43b581;');
 });
 
 window.addEventListener('beforeunload', () => {
