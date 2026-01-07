@@ -487,13 +487,14 @@ class BotControlPanel {
     }
   }
 
-  // DELETE FILE
-  async deleteFile(filename) {
+  // DELETE FILE OR FOLDER
+  async deleteFile(filename, isFolder = false) {
     this.closeAllFileMenus();
     
+    const type = isFolder ? 'folder' : 'file';
     const confirmDelete = await this.showConfirmDialog(
-      'Delete File',
-      `Are you sure you want to delete "${filename}"?`,
+      `Delete ${type.charAt(0).toUpperCase() + type.slice(1)}`,
+      `Are you sure you want to delete this ${type}: "${filename}"?${isFolder ? ' All contents will be deleted.' : ''}`,
       'Delete',
       'Cancel'
     );
@@ -523,27 +524,6 @@ class BotControlPanel {
   showCreateModal() {
     const modal = document.createElement('div');
     modal.className = 'create-modal-overlay';
-    createModalBody.innerHTML = `
-      <div class="create-type-selector">
-        <div class="create-type-option active" data-type="file">
-          <i class="fas fa-file"></i>
-          <span>File</span>
-        </div>
-        <div class="create-type-option" data-type="folder">
-          <i class="fas fa-folder"></i>
-          <span>Folder</span>
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Parent Folder (optional)</label>
-        <input type="text" class="form-input" id="parentFolderInput" placeholder="folder/subfolder/" />
-        <small style="color: var(--text-muted); font-size: 12px;">Leave empty for root folder</small>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Name</label>
-        <input type="text" class="form-input" id="createNameInput" placeholder="Enter name..." />
-      </div>
-    `;    
     modal.innerHTML = `
       <div class="create-modal">
         <div class="create-modal-header">
@@ -614,20 +594,17 @@ class BotControlPanel {
     setTimeout(() => nameInput.focus(), 100);
   }
 
-  async createFileOrFolder(filename, isFolder, parentFolder = '', modal) {
+  async createFileOrFolder(filename, isFolder, modal) {
     const confirmBtn = modal.querySelector('#createConfirmBtn');
     confirmBtn.disabled = true;
     confirmBtn.innerHTML = '<span class="spinner"></span> Creating...';
     
     try {
-      // Build full path
-      const fullPath = parentFolder ? path.join(parentFolder, filename) : filename;
-      
       const response = await fetch('/api/files/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          filename: fullPath, 
+          filename, 
           content: '', 
           isFolder 
         })
@@ -704,13 +681,13 @@ class BotControlPanel {
     try {
       const response = await fetch('/api/files');
       if (!response.ok) throw new Error('Failed to fetch files');
-  
+
       const files = await response.json();
       const fileList = document.getElementById('fileList');
       const totalFiles = document.getElementById('totalFiles');
-  
-      if (totalFiles) totalFiles.textContent = this.countTotalItems(files);
-  
+
+      if (totalFiles) totalFiles.textContent = files.length;
+
       if (!files || files.length === 0) {
         fileList.innerHTML = `
           <div style="text-align: center; color: var(--text-muted); padding: 40px;">
@@ -720,81 +697,75 @@ class BotControlPanel {
         `;
         return;
       }
-  
-      fileList.innerHTML = this.renderFileList(files);
+
+      fileList.innerHTML = files.map(file => {
+        const icon = this.getFileIcon(file.name, file.isDirectory);
+        const isZip = file.type === '.zip';
+        const isFolder = file.isDirectory;
+        const isEditable = !isFolder && this.isEditableFile(file.name);
+        
+        return `
+          <div class="file-item">
+            <div class="file-icon">${icon}</div>
+            <div class="file-info">
+              <div class="file-name">
+                ${isFolder ? '📁 ' : ''}${this.escapeHtml(file.name)}
+                ${isFolder ? ' <span style="color: var(--text-muted); font-size: 12px;">(Folder)</span>' : ''}
+              </div>
+              <div class="file-meta">${isFolder ? 'Folder' : this.formatFileSize(file.size)} • ${file.type || 'file'} • ${new Date(file.modified).toLocaleDateString()}</div>
+            </div>
+            <div class="file-actions">
+              <button class="file-menu-btn" onclick="botPanel.toggleFileMenu('${this.escapeHtml(file.name)}', event)">
+                <i class="fas fa-ellipsis-v"></i>
+              </button>
+              <div class="file-menu">
+                ${isEditable ? `
+                  <div class="file-menu-item" onclick="botPanel.editFile('${this.escapeHtml(file.name)}')">
+                    <i class="fas fa-edit"></i>
+                    <span>Edit</span>
+                  </div>
+                ` : ''}
+                ${isZip ? `
+                  <div class="file-menu-item" onclick="botPanel.extractZip('${this.escapeHtml(file.name)}')">
+                    <i class="fas fa-file-archive"></i>
+                    <span>Extract</span>
+                  </div>
+                ` : ''}
+                ${!isFolder ? `
+                  <div class="file-menu-item" onclick="botPanel.copyFilePath('${this.escapeHtml(file.name)}')">
+                    <i class="fas fa-copy"></i>
+                    <span>Copy Path</span>
+                  </div>
+                ` : ''}
+                <div class="file-menu-item danger" onclick="botPanel.deleteFile('${this.escapeHtml(file.name)}', ${isFolder})">
+                  <i class="fas fa-trash"></i>
+                  <span>Delete</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
     } catch (error) {
       console.error('Error updating files list:', error);
     }
   }
-  
-  countTotalItems(items) {
-    let count = 0;
-    for (const item of items) {
-      count++;
-      if (item.isDirectory && item.items) {
-        count += this.countTotalItems(item.items);
-      }
+
+  isEditableFile(filename) {
+    const editableExtensions = ['.js', '.json', '.txt', '.env', '.md', '.html', '.css', '.xml', '.yml', '.yaml', '.gitignore'];
+    const ext = '.' + filename.split('.').pop().toLowerCase();
+    
+    // Check if file starts with . (like .env, .gitignore)
+    if (filename.startsWith('.')) {
+      return true; // Allow editing hidden files
     }
-    return count;
+    
+    return editableExtensions.includes(ext);
   }
-  
-  renderFileList(items, depth = 0) {
-    return items.map(item => {
-      const icon = this.getFileIcon(item.name, item.isDirectory);
-      const isEditable = item.isDirectory ? false : this.isEditableFile(item.name);
-      const indent = depth * 20;
-      
-      return `
-        <div class="file-item" style="margin-left: ${indent}px;">
-          <div class="file-icon">${icon}</div>
-          <div class="file-info">
-            <div class="file-name">
-              ${this.escapeHtml(item.originalName || item.name)}
-              ${item.isDirectory ? ' <span style="color: var(--text-muted); font-size: 12px;">(folder)</span>' : ''}
-            </div>
-            <div class="file-meta">
-              ${item.isDirectory ? 
-                `${item.items?.length || 0} items • folder • ` : 
-                `${this.formatFileSize(item.size)} • ${item.type} • `}
-              ${new Date(item.modified).toLocaleDateString()}
-            </div>
-          </div>
-          <div class="file-actions">
-            <button class="file-menu-btn" onclick="botPanel.toggleFileMenu('${this.escapeHtml(item.name)}', event)">
-              <i class="fas fa-ellipsis-v"></i>
-            </button>
-            <div class="file-menu">
-              ${!item.isDirectory && isEditable ? `
-                <div class="file-menu-item" onclick="botPanel.editFile('${this.escapeHtml(item.name)}')">
-                  <i class="fas fa-edit"></i>
-                  <span>Edit</span>
-                </div>
-              ` : ''}
-              ${!item.isDirectory && item.type === '.zip' ? `
-                <div class="file-menu-item" onclick="botPanel.extractZip('${this.escapeHtml(item.name)}')">
-                  <i class="fas fa-file-archive"></i>
-                  <span>Extract</span>
-                </div>
-              ` : ''}
-              <div class="file-menu-item" onclick="botPanel.copyFilePath('${this.escapeHtml(item.name)}')">
-                <i class="fas fa-copy"></i>
-                <span>Copy Path</span>
-              </div>
-              <div class="file-menu-item danger" onclick="botPanel.deleteFile('${this.escapeHtml(item.name)}')">
-                <i class="fas fa-trash"></i>
-                <span>Delete</span>
-              </div>
-            </div>
-          </div>
-        </div>
-        ${item.isDirectory && item.items ? this.renderFileList(item.items, depth + 1) : ''}
-      `;
-    }).join('');
-  }
-  
-  getFileIcon(filename, isDirectory = false) {
+
+  getFileIcon(filename, isDirectory) {
     if (isDirectory) {
-      return '<i class="fas fa-folder" style="color: #ffd700;"></i>';
+      return '<i class="fas fa-folder" style="color: #faa61a;"></i>';
     }
     
     const ext = filename.split('.').pop().toLowerCase();
@@ -805,32 +776,17 @@ class BotControlPanel {
       'env': '<i class="fas fa-lock" style="color: #f04747;"></i>',
       'md': '<i class="fas fa-file" style="color: #7289da;"></i>',
       'zip': '<i class="fas fa-file-archive" style="color: #faa61a;"></i>',
-      'rar': '<i class="fas fa-file-archive" style="color: #faa61a;"></i>',
-      '7z': '<i class="fas fa-file-archive" style="color: #faa61a;"></i>',
       'html': '<i class="fab fa-html5" style="color: #e34c26;"></i>',
       'css': '<i class="fab fa-css3" style="color: #264de4;"></i>',
-      'py': '<i class="fab fa-python" style="color: #3776ab;"></i>',
-      'php': '<i class="fab fa-php" style="color: #777bb4;"></i>',
-      'jpg': '<i class="fas fa-file-image" style="color: #d4a017;"></i>',
-      'jpeg': '<i class="fas fa-file-image" style="color: #d4a017;"></i>',
-      'png': '<i class="fas fa-file-image" style="color: #4caf50;"></i>',
-      'gif': '<i class="fas fa-file-image" style="color: #9c27b0;"></i>',
-      'mp3': '<i class="fas fa-file-audio" style="color: #9c27b0;"></i>',
-      'mp4': '<i class="fas fa-file-video" style="color: #ff5722;"></i>',
-      'pdf': '<i class="fas fa-file-pdf" style="color: #f44336;"></i>',
-      'doc': '<i class="fas fa-file-word" style="color: #2b579a;"></i>',
-      'docx': '<i class="fas fa-file-word" style="color: #2b579a;"></i>',
-      'xls': '<i class="fas fa-file-excel" style="color: #217346;"></i>',
-      'xlsx': '<i class="fas fa-file-excel" style="color: #217346;"></i>'
+      'gitignore': '<i class="fab fa-git-alt" style="color: #f34f29;"></i>'
     };
     
+    // Check if filename starts with . (hidden files)
+    if (filename.startsWith('.')) {
+      return '<i class="fas fa-lock" style="color: #f04747;"></i>';
+    }
+    
     return icons[ext] || '<i class="fas fa-file"></i>';
-  }
-  
-  isEditableFile(filename) {
-    const editableExtensions = ['.js', '.json', '.txt', '.env', '.md', '.html', '.css', '.xml', '.yml', '.yaml', '.ini', '.cfg', '.conf', '.log', '.sh', '.bat', '.ps1'];
-    const ext = '.' + filename.split('.').pop().toLowerCase();
-    return editableExtensions.includes(ext);
   }
 
   async startBot() {
