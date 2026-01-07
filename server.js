@@ -114,7 +114,13 @@ const AVAILABLE_NODE_VERSIONS = ['18', '19', '20', '21'];
 
 // Helper functions
 const addLog = (message, type = 'info', username = 'system') => {
-  const timestamp = new Date().toLocaleTimeString();
+  const now = new Date();
+  const timestamp = now.toLocaleTimeString('en-US', { 
+    hour12: false, 
+    hour: '2-digit', 
+    minute: '2-digit', 
+    second: '2-digit' 
+  });
   const logEntry = { 
     timestamp, 
     message: String(message).substring(0, 1000),
@@ -155,6 +161,10 @@ const stopBot = () => {
         clearInterval(uptimeInterval);
         uptimeInterval = null;
       }
+      
+      // RESET UPTIME TO 0 WHEN BOT STOPS
+      uptime = 0;
+      botStartTime = null;
       
       addLog('Bot process stopped', 'warning');
       return true;
