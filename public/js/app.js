@@ -405,7 +405,7 @@ class BotControlPanel {
   copyFilePath(filename) {
     this.closeAllFileMenus();
     
-    const path = `./bot_files/${filename}`;
+    const path = `./home/${filename}`;
     
     if (navigator.clipboard) {
       navigator.clipboard.writeText(path).then(() => {
@@ -699,7 +699,7 @@ class BotControlPanel {
           <i class="fas fa-folder"></i>
           <span>Path:</span>
           <span style="color: var(--accent-primary); cursor: pointer;" onclick="botPanel.navigateToFolder('')">
-            /bot_files
+            /home
           </span>
       `;
       
@@ -919,7 +919,7 @@ class BotControlPanel {
   }
 
   updateConsole(logs) {
-    const console = document.getElementById('console');
+    const consoleEl = document.getElementById('console');
     
     if (!logs || logs.length === 0) {
       const now = new Date();
@@ -929,7 +929,7 @@ class BotControlPanel {
         minute: '2-digit', 
         second: '2-digit' 
       });
-      console.innerHTML = `
+      consoleEl.innerHTML = `
         <div class="console-line info">
           <span class="console-timestamp">[${timeStr}]</span>
           <span>Waiting for logs...</span>
@@ -938,7 +938,10 @@ class BotControlPanel {
       return;
     }
 
-    console.innerHTML = logs.map(log => {
+    // Check if user is scrolled up
+    const isScrolledToBottom = consoleEl.scrollHeight - consoleEl.clientHeight <= consoleEl.scrollTop + 50;
+
+    consoleEl.innerHTML = logs.map(log => {
       const typeClass = log.type || 'info';
       return `
         <div class="console-line ${typeClass}">
@@ -948,7 +951,10 @@ class BotControlPanel {
       `;
     }).join('');
 
-    console.scrollTop = console.scrollHeight;
+    // Only auto-scroll if user was at bottom
+    if (isScrolledToBottom) {
+      consoleEl.scrollTop = consoleEl.scrollHeight;
+    }
   }
 
   async updateStatus() {
