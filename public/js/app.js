@@ -7,6 +7,8 @@ class BotControlPanel {
     this.currentPage = 'console';
     this.uptimeInterval = null;
     this.currentFileMenu = null;
+    this.activeToasts = []; // Track active toasts
+    this.maxToasts = 3; // Maximum 3 toasts
     this.init();
   }
 
@@ -149,9 +151,10 @@ class BotControlPanel {
     document.getElementById('saveTokenBtn')?.addEventListener('click', () => this.saveToken());
 
     const fileInput = document.getElementById('fileInput');
-    const uploadZone = document.getElementById('uploadZone');
+    const uploadBtn = document.getElementById('uploadBtn');
     
-    uploadZone?.addEventListener('click', () => fileInput?.click());
+    // Upload button click
+    uploadBtn?.addEventListener('click', () => fileInput?.click());
     fileInput?.addEventListener('change', (e) => this.handleFileUpload(e));
 
     document.getElementById('startBtn')?.addEventListener('click', () => this.startBot());
@@ -195,36 +198,8 @@ class BotControlPanel {
   }
 
   setupDragAndDrop() {
-    const uploadZone = document.getElementById('uploadZone');
-    if (!uploadZone) return;
-
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-      uploadZone.addEventListener(eventName, (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-      });
-    });
-
-    ['dragenter', 'dragover'].forEach(eventName => {
-      uploadZone.addEventListener(eventName, () => {
-        uploadZone.style.borderColor = '#5865f2';
-        uploadZone.style.backgroundColor = 'rgba(88, 101, 242, 0.1)';
-      });
-    });
-
-    ['dragleave', 'drop'].forEach(eventName => {
-      uploadZone.addEventListener(eventName, () => {
-        uploadZone.style.borderColor = '';
-        uploadZone.style.backgroundColor = '';
-      });
-    });
-
-    uploadZone.addEventListener('drop', (e) => {
-      const files = e.dataTransfer.files;
-      if (files.length > 0) {
-        this.uploadFile(files[0]);
-      }
-    });
+    // DRAG & DROP REMOVED - ONLY UPLOAD BUTTON NOW
+    return;
   }
 
   async saveToken() {
@@ -286,10 +261,10 @@ class BotControlPanel {
     const formData = new FormData();
     formData.append('file', file);
 
-    const uploadZone = document.getElementById('uploadZone');
-    const originalText = uploadZone.querySelector('.upload-text').textContent;
-    uploadZone.querySelector('.upload-text').textContent = 'Uploading...';
-    uploadZone.style.opacity = '0.7';
+    const uploadBtn = document.getElementById('uploadBtn');
+    const originalText = uploadBtn.innerHTML;
+    uploadBtn.disabled = true;
+    uploadBtn.innerHTML = '<span class="spinner"></span> Uploading...';
 
     try {
       const response = await fetch('/api/upload', {
@@ -314,8 +289,8 @@ class BotControlPanel {
       console.error('Error uploading file:', error);
       this.showToast('Upload failed. Please try again.', 'error');
     } finally {
-      uploadZone.querySelector('.upload-text').textContent = originalText;
-      uploadZone.style.opacity = '1';
+      uploadBtn.disabled = false;
+      uploadBtn.innerHTML = originalText;
     }
   }
 
@@ -698,11 +673,19 @@ class BotControlPanel {
         return;
       }
 
-      fileList.innerHTML = files.map(file => {
+      // SORT: Folders first, then files
+      const sortedFiles = files.sort((a, b) => {
+        if (a.isDirectory && !b.isDirectory) return -1;
+        if (!a.isDirectory && b.isDirectory) return 1;
+        return b.modified - a.modified;
+      });
+
+      fileList.innerHTML = sortedFiles.map(file => {
         const icon = this.getFileIcon(file.name, file.isDirectory);
         const isZip = file.type === '.zip';
         const isFolder = file.isDirectory;
         const isEditable = !isFolder && this.isEditableFile(file.name);
+        const filePath = `./bot_files/${file.name}`;
         
         return `
           <div class="file-item">
@@ -712,7 +695,11 @@ class BotControlPanel {
                 ${isFolder ? '📁 ' : ''}${this.escapeHtml(file.name)}
                 ${isFolder ? ' <span style="color: var(--text-muted); font-size: 12px;">(Folder)</span>' : ''}
               </div>
-              <div class="file-meta">${isFolder ? 'Folder' : this.formatFileSize(file.size)} • ${file.type || 'file'} • ${new Date(file.modified).toLocaleDateString()}</div>
+              <div class="file-meta">
+                <span style="color: var(--text-muted); font-size: 11px;">${this.escapeHtml(filePath)}</span>
+                <span style="margin: 0 8px;">•</span>
+                ${isFolder ? 'Folder' : this.formatFileSize(file.size)} • ${file.type || 'file'} • ${new Date(file.modified).toLocaleDateString()}
+              </div>
             </div>
             <div class="file-actions">
               <button class="file-menu-btn" onclick="botPanel.toggleFileMenu('${this.escapeHtml(file.name)}', event)">
@@ -863,9 +850,16 @@ class BotControlPanel {
     try {
       await fetch('/api/logs', { method: 'DELETE' });
       const console = document.getElementById('console');
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('en-US', { 
+        hour12: false, 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        second: '2-digit' 
+      });
       console.innerHTML = `
         <div class="console-line info">
-          <span class="console-timestamp">[${new Date().toLocaleTimeString()}]</span>
+          <span class="console-timestamp">[${timeStr}]</span>
           <span>Logs cleared</span>
         </div>
       `;
@@ -880,9 +874,16 @@ class BotControlPanel {
     const console = document.getElementById('console');
     
     if (!logs || logs.length === 0) {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('en-US', { 
+        hour12: false, 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        second: '2-digit' 
+      });
       console.innerHTML = `
         <div class="console-line info">
-          <span class="console-timestamp">[${new Date().toLocaleTimeString()}]</span>
+          <span class="console-timestamp">[${timeStr}]</span>
           <span>Waiting for logs...</span>
         </div>
       `;
@@ -1122,6 +1123,14 @@ class BotControlPanel {
     const container = document.getElementById('toastContainer');
     if (!container) return;
 
+    // Remove oldest toast if we have 3 already
+    if (this.activeToasts.length >= this.maxToasts) {
+      const oldestToast = this.activeToasts.shift();
+      if (oldestToast && oldestToast.parentElement) {
+        oldestToast.remove();
+      }
+    }
+
     const icons = {
       success: '<i class="fas fa-check-circle"></i>',
       error: '<i class="fas fa-times-circle"></i>',
@@ -1138,12 +1147,17 @@ class BotControlPanel {
     `;
 
     container.appendChild(toast);
+    this.activeToasts.push(toast);
 
     const closeBtn = toast.querySelector('.toast-close');
-    closeBtn.addEventListener('click', () => toast.remove());
+    closeBtn.addEventListener('click', () => {
+      toast.remove();
+      this.activeToasts = this.activeToasts.filter(t => t !== toast);
+    });
 
     setTimeout(() => {
       toast.remove();
+      this.activeToasts = this.activeToasts.filter(t => t !== toast);
     }, 4000);
   }
 }
