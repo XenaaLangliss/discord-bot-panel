@@ -39,9 +39,9 @@ RUN npm install --production
 COPY server.js ./
 COPY public ./public
 
-# Create bot_files directory with proper permissions
-RUN mkdir -p /app/bot_files && \
-    chmod 755 /app/bot_files && \
+# Create home directory with proper permissions (changed from bot_files)
+RUN mkdir -p /app/home && \
+    chmod 755 /app/home && \
     mkdir -p /app/logs && \
     chmod 755 /app/logs
 

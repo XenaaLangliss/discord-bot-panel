@@ -109,6 +109,26 @@ let uptime = 0;
 let uptimeInterval = null;
 let selectedNodeVersion = process.env.DEFAULT_NODE_VERSION || '18';
 
+// LOAD TOKEN FROM .env FILE IF EXISTS
+const loadTokenFromEnv = () => {
+  const envPath = path.join('./home', '.env');
+  if (fs.existsSync(envPath)) {
+    try {
+      const envContent = fs.readFileSync(envPath, 'utf8');
+      const tokenMatch = envContent.match(/DISCORD_TOKEN=(.+)/);
+      if (tokenMatch && tokenMatch[1]) {
+        botToken = tokenMatch[1].trim();
+        addLog('Bot token loaded from .env file', 'success', 'system');
+      }
+    } catch (error) {
+      addLog(`Error loading token from .env: ${error.message}`, 'warning', 'system');
+    }
+  }
+};
+
+// Load token on startup
+loadTokenFromEnv();
+
 // Available Node.js versions - SIMPLIFIED
 const AVAILABLE_NODE_VERSIONS = ['18', '19', '20', '21'];
 
@@ -193,7 +213,7 @@ const validateBotToken = (token) => {
   return true;
 };
 
-// IMPROVED ZIP EXTRACTION - NO RESTRICTIONS
+// IMPROVED ZIP EXTRACTION - FULL SUPPORT FOR NESTED FOLDERS
 const extractZipFile = async (zipPath, extractDir) => {
   return new Promise(async (resolve, reject) => {
     try {
@@ -208,9 +228,10 @@ const extractZipFile = async (zipPath, extractDir) => {
         fs.mkdirSync(extractDir, { recursive: true });
       }
       
+      // First pass: Create all directories
       for (const entry of zipEntries) {
         try {
-          // Skip macOS metadata files only
+          // Skip macOS metadata files
           if (entry.entryName.includes('__MACOSX')) {
             continue;
           }
@@ -220,8 +241,25 @@ const extractZipFile = async (zipPath, extractDir) => {
           if (entry.isDirectory) {
             if (!fs.existsSync(entryPath)) {
               fs.mkdirSync(entryPath, { recursive: true });
+              addLog(`Created directory: ${entry.entryName}`, 'info');
             }
-          } else {
+          }
+        } catch (err) {
+          addLog(`Warning: Could not create directory ${entry.entryName}: ${err.message}`, 'warning');
+        }
+      }
+      
+      // Second pass: Extract all files
+      for (const entry of zipEntries) {
+        try {
+          // Skip macOS metadata files
+          if (entry.entryName.includes('__MACOSX')) {
+            continue;
+          }
+          
+          const entryPath = path.join(extractDir, entry.entryName);
+          
+          if (!entry.isDirectory) {
             const parentDir = path.dirname(entryPath);
             if (!fs.existsSync(parentDir)) {
               fs.mkdirSync(parentDir, { recursive: true });
@@ -239,7 +277,7 @@ const extractZipFile = async (zipPath, extractDir) => {
         }
       }
       
-      addLog(`Extraction complete: ${extractedCount} files extracted`, 'success');
+      addLog(`Extraction complete: ${extractedCount} files extracted from ${zipEntries.length} total entries`, 'success');
       
       resolve({ 
         extractedCount, 
@@ -318,7 +356,7 @@ app.get('/api/status', (req, res) => {
   res.json({
     status: botStatus,
     logs: logs.slice(-100),
-    filesCount: fs.existsSync('./bot_files') ? fs.readdirSync('./bot_files').length : 0,
+    filesCount: fs.existsSync('./home') ? fs.readdirSync('./home').length : 0,
     uptime: uptime,
     memoryUsage: memoryUsage.heapUsed,
     memoryTotal: memoryUsage.heapTotal,
@@ -369,7 +407,7 @@ app.post('/api/system/switch-node', async (req, res) => {
 });
 
 app.get('/api/files', (req, res) => {
-  const dir = './bot_files';
+  const dir = './home';
   if (!fs.existsSync(dir)) {
     return res.json([]);
   }
@@ -443,7 +481,7 @@ app.post('/api/extract-zip/:filename', async (req, res) => {
     return res.status(400).json({ error: 'Invalid filename' });
   }
   
-  const zipPath = path.join('./bot_files', filename);
+  const zipPath = path.join('./home', filename);
   
   if (!fs.existsSync(zipPath)) {
     return res.status(404).json({ error: 'ZIP file not found' });
@@ -457,7 +495,7 @@ app.post('/api/extract-zip/:filename', async (req, res) => {
   try {
     addLog(`Extracting ZIP: ${filename}`, 'info', username);
     
-    const result = await extractZipFile(zipPath, './bot_files');
+    const result = await extractZipFile(zipPath, './home');
     
     // Delete ZIP after extraction
     try {
@@ -490,7 +528,7 @@ app.get('/api/files/:filename/content', (req, res) => {
     return res.status(400).json({ error: 'Invalid filename' });
   }
   
-  const filepath = path.join('./bot_files', filename);
+  const filepath = path.join('./home', filename);
   
   if (!fs.existsSync(filepath)) {
     return res.status(404).json({ error: 'File not found' });
@@ -532,7 +570,7 @@ app.put('/api/files/:filename/content', (req, res) => {
     return res.status(400).json({ error: 'Invalid filename' });
   }
   
-  const filepath = path.join('./bot_files', filename);
+  const filepath = path.join('./home', filename);
   
   if (!fs.existsSync(filepath)) {
     return res.status(404).json({ error: 'File not found' });
@@ -566,7 +604,7 @@ app.post('/api/files/create', (req, res) => {
     return res.status(400).json({ error: 'Invalid filename' });
   }
   
-  const filepath = path.join('./bot_files', filename);
+  const filepath = path.join('./home', filename);
   
   if (fs.existsSync(filepath)) {
     return res.status(400).json({ error: 'File or folder already exists' });
@@ -613,7 +651,7 @@ app.post('/api/token', (req, res) => {
   botToken = token;
   
   try {
-    const dir = './bot_files';
+    const dir = './home';
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
@@ -643,11 +681,16 @@ app.post('/api/start', async (req, res) => {
     return res.status(400).json({ error: 'Dependencies are being installed. Please wait...' });
   }
   
+  // TRY TO LOAD TOKEN FROM .env IF NOT SET
+  if (!botToken) {
+    loadTokenFromEnv();
+  }
+  
   if (!botToken) {
     return res.status(400).json({ error: 'Please set Discord bot token first' });
   }
   
-  const dir = './bot_files';
+  const dir = './home';
   if (!fs.existsSync(dir)) {
     return res.status(400).json({ error: 'No bot files found. Please upload your bot files first.' });
   }
@@ -840,7 +883,7 @@ app.delete('/api/files/:filename', (req, res) => {
     return res.status(400).json({ error: 'Invalid filename' });
   }
   
-  const filepath = path.join('./bot_files', filename);
+  const filepath = path.join('./home', filename);
   
   if (!fs.existsSync(filepath)) {
     return res.status(404).json({ error: 'File not found' });
