@@ -703,38 +703,32 @@ class BotControlPanel {
         return;
       }
 
-      // SORT: Folders first, then files
-      const sortedFiles = files.sort((a, b) => {
+      // SIMPLE FILTER
+      let displayFiles = [];
+      
+      if (this.currentPath === '') {
+        // ROOT: Show only files/folders without slash
+        displayFiles = files.filter(f => !f.name.includes('/'));
+      } else {
+        // IN FOLDER: Show direct children only
+        displayFiles = files.filter(f => {
+          // Must start with current path
+          if (!f.name.startsWith(this.currentPath + '/')) {
+            return false;
+          }
+          // Get part after current path
+          const remainder = f.name.substring(this.currentPath.length + 1);
+          // Must not have another slash (direct child only)
+          return !remainder.includes('/');
+        });
+      }
+
+      // Sort: Folders first
+      displayFiles.sort((a, b) => {
         if (a.isDirectory && !b.isDirectory) return -1;
         if (!a.isDirectory && b.isDirectory) return 1;
-        return b.modified - a.modified;
+        return a.name.localeCompare(b.name);
       });
-
-      // Filter files based on current path
-      let displayFiles = sortedFiles;
-      
-      if (this.currentPath) {
-        displayFiles = sortedFiles.filter(file => {
-          const relativePath = file.name;
-          const pathParts = relativePath.split('/');
-          const currentParts = this.currentPath.split('/');
-          
-          // Check if file is in current folder
-          if (pathParts.length === currentParts.length + 1) {
-            // Check if all parent parts match
-            for (let i = 0; i < currentParts.length; i++) {
-              if (pathParts[i] !== currentParts[i]) {
-                return false;
-              }
-            }
-            return true;
-          }
-          return false;
-        });
-      } else {
-        // Root: only show files without / in name
-        displayFiles = sortedFiles.filter(file => !file.name.includes('/'));
-      }
 
       // Breadcrumb
       let breadcrumbHTML = `
@@ -763,25 +757,27 @@ class BotControlPanel {
       
       breadcrumbHTML += '</div>';
 
-      fileList.innerHTML = breadcrumbHTML + (displayFiles.length === 0 ? `
-        <div style="text-align: center; color: var(--text-muted); padding: 40px;">
-          <div style="font-size: 48px; margin-bottom: 16px;"><i class="fas fa-folder-open"></i></div>
-          <div>Empty folder</div>
-          <button class="btn btn-secondary btn-sm" style="margin-top: 16px;" onclick="botPanel.navigateToFolder('')">
-            <i class="fas fa-arrow-left"></i> Back to Root
-          </button>
-        </div>
-      ` : displayFiles.map(file => {
+      if (displayFiles.length === 0) {
+        fileList.innerHTML = breadcrumbHTML + `
+          <div style="text-align: center; color: var(--text-muted); padding: 40px;">
+            <div style="font-size: 48px; margin-bottom: 16px;"><i class="fas fa-folder-open"></i></div>
+            <div>Empty folder</div>
+            <button class="btn btn-secondary btn-sm" style="margin-top: 16px;" onclick="botPanel.navigateToFolder('')">
+              <i class="fas fa-arrow-left"></i> Back to Root
+            </button>
+          </div>
+        `;
+        return;
+      }
+
+      fileList.innerHTML = breadcrumbHTML + displayFiles.map(file => {
         const icon = this.getFileIcon(file.name, file.isDirectory);
         const isZip = file.type === '.zip';
         const isFolder = file.isDirectory;
         const isEditable = !isFolder && this.isEditableFile(file.name);
         
-        // Get display name (remove path prefix)
-        let displayName = file.name;
-        if (this.currentPath) {
-          displayName = file.name.replace(this.currentPath + '/', '');
-        }
+        // Display name: just the filename, not full path
+        const displayName = file.name.split('/').pop();
         
         return `
           <div class="file-item" ${isFolder ? `style="cursor: pointer;" onclick="botPanel.navigateToFolder('${this.escapeHtml(file.name)}')"` : ''}>
@@ -826,7 +822,7 @@ class BotControlPanel {
             </div>
           </div>
         `;
-      }).join(''));
+      }).join('');
     } catch (error) {
       console.error('Error updating files list:', error);
     }

@@ -109,6 +109,24 @@ let uptime = 0;
 let uptimeInterval = null;
 let selectedNodeVersion = process.env.DEFAULT_NODE_VERSION || '18';
 
+// ENSURE HOME FOLDER EXISTS ON STARTUP
+const ensureHomeFolder = () => {
+  const homeDir = './home';
+  if (!fs.existsSync(homeDir)) {
+    try {
+      fs.mkdirSync(homeDir, { recursive: true });
+      addLog('Home folder created', 'success', 'system');
+    } catch (error) {
+      console.error('Failed to create home folder:', error);
+    }
+  } else {
+    addLog('Home folder exists', 'info', 'system');
+  }
+};
+
+// Create home folder immediately
+ensureHomeFolder();
+
 // LOAD TOKEN FROM .env FILE IF EXISTS
 const loadTokenFromEnv = () => {
   const envPath = path.join('./home', '.env');
@@ -442,42 +460,48 @@ app.post('/api/system/switch-node', async (req, res) => {
 
 app.get('/api/files', (req, res) => {
   const dir = './home';
+  
+  // Ensure home folder exists
   if (!fs.existsSync(dir)) {
-    return res.json([]);
+    fs.mkdirSync(dir, { recursive: true });
   }
   
   try {
-    // READ ALL FILES INCLUDING HIDDEN FILES - RECURSIVE
-    const getAllFiles = (dirPath, arrayOfFiles = []) => {
-      const files = fs.readdirSync(dirPath, { withFileTypes: true });
+    // SIMPLE: Read directory recursively with proper paths
+    const getAllFiles = (dirPath, basePath = '') => {
+      const items = [];
+      const files = fs.readdirSync(dirPath);
       
-      files.forEach(dirent => {
-        const fullPath = path.join(dirPath, dirent.name);
-        const relativePath = fullPath.replace(dir + '/', '').replace(dir, '');
+      for (const file of files) {
+        const fullPath = path.join(dirPath, file);
+        const relativePath = basePath ? path.join(basePath, file) : file;
+        const stats = fs.statSync(fullPath);
         
-        if (dirent.isDirectory()) {
-          arrayOfFiles.push({
-            name: relativePath || dirent.name,
+        if (stats.isDirectory()) {
+          // Add folder
+          items.push({
+            name: relativePath,
             size: 0,
             type: 'folder',
-            modified: fs.statSync(fullPath).mtime,
+            modified: stats.mtime,
             isDirectory: true
           });
-          // Recursively get files in subdirectories
-          getAllFiles(fullPath, arrayOfFiles);
+          // Get files inside folder
+          const subItems = getAllFiles(fullPath, relativePath);
+          items.push(...subItems);
         } else {
-          const stats = fs.statSync(fullPath);
-          arrayOfFiles.push({
-            name: relativePath || dirent.name,
+          // Add file
+          items.push({
+            name: relativePath,
             size: stats.size,
-            type: path.extname(dirent.name),
+            type: path.extname(file),
             modified: stats.mtime,
             isDirectory: false
           });
         }
-      });
+      }
       
-      return arrayOfFiles;
+      return items;
     };
     
     const allFiles = getAllFiles(dir);
@@ -509,7 +533,16 @@ app.post('/api/upload', async (req, res) => {
     
     try {
       const fileSizeKB = (req.file.size / 1024).toFixed(2);
-      addLog(`File uploaded: ${req.file.originalname} (${fileSizeKB} KB)`, 'success', username);
+      const uploadedPath = req.file.path;
+      
+      addLog(`File uploaded: ${req.file.originalname} (${fileSizeKB} KB) to ${uploadedPath}`, 'success', username);
+      
+      // Verify file exists
+      if (fs.existsSync(uploadedPath)) {
+        addLog(`File verified at: ${uploadedPath}`, 'success', username);
+      } else {
+        addLog(`WARNING: File not found at: ${uploadedPath}`, 'error', username);
+      }
       
       res.json({ 
         message: 'File uploaded successfully',
