@@ -109,48 +109,10 @@ let uptime = 0;
 let uptimeInterval = null;
 let selectedNodeVersion = process.env.DEFAULT_NODE_VERSION || '18';
 
-// ENSURE HOME FOLDER EXISTS ON STARTUP
-const ensureHomeFolder = () => {
-  const homeDir = './home';
-  if (!fs.existsSync(homeDir)) {
-    try {
-      fs.mkdirSync(homeDir, { recursive: true });
-      addLog('Home folder created', 'success', 'system');
-    } catch (error) {
-      console.error('Failed to create home folder:', error);
-    }
-  } else {
-    addLog('Home folder exists', 'info', 'system');
-  }
-};
-
-// Create home folder immediately
-ensureHomeFolder();
-
-// LOAD TOKEN FROM .env FILE IF EXISTS
-const loadTokenFromEnv = () => {
-  const envPath = path.join('./home', '.env');
-  if (fs.existsSync(envPath)) {
-    try {
-      const envContent = fs.readFileSync(envPath, 'utf8');
-      const tokenMatch = envContent.match(/DISCORD_TOKEN=(.+)/);
-      if (tokenMatch && tokenMatch[1]) {
-        botToken = tokenMatch[1].trim();
-        addLog('Bot token loaded from .env file', 'success', 'system');
-      }
-    } catch (error) {
-      addLog(`Error loading token from .env: ${error.message}`, 'warning', 'system');
-    }
-  }
-};
-
-// Load token on startup
-loadTokenFromEnv();
-
 // Available Node.js versions - SIMPLIFIED
 const AVAILABLE_NODE_VERSIONS = ['18', '19', '20', '21'];
 
-// Helper functions
+// Helper functions - DEFINE FIRST BEFORE USING
 const addLog = (message, type = 'info', username = 'system') => {
   const now = new Date();
   const timestamp = now.toLocaleTimeString('en-US', { 
@@ -180,6 +142,46 @@ const addLog = (message, type = 'info', username = 'system') => {
   
   console.log(`${typeColors[type] || '\x1b[0m'}[${type.toUpperCase()}] [${username}]\x1b[0m ${message}`);
 };
+
+// ENSURE HOME FOLDER EXISTS ON STARTUP
+const ensureHomeFolder = () => {
+  const homeDir = './home';
+  if (!fs.existsSync(homeDir)) {
+    try {
+      fs.mkdirSync(homeDir, { recursive: true });
+      console.log('✅ Home folder created');
+      addLog('Home folder created', 'success', 'system');
+    } catch (error) {
+      console.error('❌ Failed to create home folder:', error);
+    }
+  } else {
+    console.log('✅ Home folder exists');
+    addLog('Home folder exists', 'info', 'system');
+  }
+};
+
+// Create home folder immediately
+ensureHomeFolder();
+
+// LOAD TOKEN FROM .env FILE IF EXISTS
+const loadTokenFromEnv = () => {
+  const envPath = path.join('./home', '.env');
+  if (fs.existsSync(envPath)) {
+    try {
+      const envContent = fs.readFileSync(envPath, 'utf8');
+      const tokenMatch = envContent.match(/DISCORD_TOKEN=(.+)/);
+      if (tokenMatch && tokenMatch[1]) {
+        botToken = tokenMatch[1].trim();
+        addLog('Bot token loaded from .env file', 'success', 'system');
+      }
+    } catch (error) {
+      addLog(`Error loading token from .env: ${error.message}`, 'warning', 'system');
+    }
+  }
+};
+
+// Load token on startup
+loadTokenFromEnv();
 
 const stopBot = () => {
   if (botProcess) {
