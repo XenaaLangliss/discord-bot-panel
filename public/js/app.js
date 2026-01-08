@@ -27,7 +27,10 @@ class BotControlPanel {
 
   setupGlobalClickHandler() {
     document.addEventListener('click', (e) => {
-      if (this.currentFileMenu && !e.target.closest('.file-menu-btn') && !e.target.closest('.file-menu')) {
+      // Close menu only if clicking outside BOTH menu and button
+      if (this.currentFileMenu && 
+          !e.target.closest('.file-menu-btn') && 
+          !e.target.closest('.file-menu')) {
         this.closeAllFileMenus();
       }
     });
@@ -58,9 +61,26 @@ class BotControlPanel {
       if (userBadge && data.username) {
         userBadge.textContent = data.username;
       }
+      
+      // Load token status after auth
+      this.checkTokenStatus();
     } catch (error) {
       console.error('Auth check error:', error);
       window.location.href = '/login';
+    }
+  }
+
+  async checkTokenStatus() {
+    try {
+      const response = await fetch('/api/token/status');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.hasToken) {
+          console.log('Token is loaded from .env');
+        }
+      }
+    } catch (error) {
+      console.error('Token check error:', error);
     }
   }
 
