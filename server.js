@@ -213,7 +213,7 @@ const validateBotToken = (token) => {
   return true;
 };
 
-// IMPROVED ZIP EXTRACTION - FULL SUPPORT FOR NESTED FOLDERS
+// IMPROVED ZIP EXTRACTION - FULL SUPPORT FOR NESTED FOLDERS WITH DEBUG
 const extractZipFile = async (zipPath, extractDir) => {
   return new Promise(async (resolve, reject) => {
     try {
@@ -228,11 +228,14 @@ const extractZipFile = async (zipPath, extractDir) => {
         fs.mkdirSync(extractDir, { recursive: true });
       }
       
+      addLog(`Starting ZIP extraction: ${zipEntries.length} entries found`, 'info');
+      
       // First pass: Create all directories
       for (const entry of zipEntries) {
         try {
           // Skip macOS metadata files
-          if (entry.entryName.includes('__MACOSX')) {
+          if (entry.entryName.includes('__MACOSX') || entry.entryName.startsWith('.')) {
+            addLog(`Skipping: ${entry.entryName}`, 'info');
             continue;
           }
           
@@ -241,11 +244,11 @@ const extractZipFile = async (zipPath, extractDir) => {
           if (entry.isDirectory) {
             if (!fs.existsSync(entryPath)) {
               fs.mkdirSync(entryPath, { recursive: true });
-              addLog(`Created directory: ${entry.entryName}`, 'info');
+              addLog(`Created directory: ${entry.entryName}`, 'success');
             }
           }
         } catch (err) {
-          addLog(`Warning: Could not create directory ${entry.entryName}: ${err.message}`, 'warning');
+          addLog(`Error creating directory ${entry.entryName}: ${err.message}`, 'error');
         }
       }
       
@@ -253,7 +256,7 @@ const extractZipFile = async (zipPath, extractDir) => {
       for (const entry of zipEntries) {
         try {
           // Skip macOS metadata files
-          if (entry.entryName.includes('__MACOSX')) {
+          if (entry.entryName.includes('__MACOSX') || entry.entryName.startsWith('.')) {
             continue;
           }
           
@@ -261,30 +264,61 @@ const extractZipFile = async (zipPath, extractDir) => {
           
           if (!entry.isDirectory) {
             const parentDir = path.dirname(entryPath);
+            
+            // Ensure parent directory exists
             if (!fs.existsSync(parentDir)) {
               fs.mkdirSync(parentDir, { recursive: true });
+              addLog(`Created parent directory: ${parentDir}`, 'info');
             }
             
+            // Extract file
             const content = entry.getData();
             fs.writeFileSync(entryPath, content);
             
             extractedCount++;
             extractedFiles.push(entry.entryName);
-            addLog(`Extracted: ${entry.entryName}`, 'info');
+            addLog(`Extracted file: ${entry.entryName} (${content.length} bytes)`, 'success');
+            
+            // Verify file exists
+            if (fs.existsSync(entryPath)) {
+              const stats = fs.statSync(entryPath);
+              addLog(`Verified: ${entry.entryName} - ${stats.size} bytes`, 'info');
+            } else {
+              addLog(`WARNING: File not found after extraction: ${entry.entryName}`, 'warning');
+            }
           }
         } catch (err) {
-          addLog(`Warning: Could not extract ${entry.entryName}: ${err.message}`, 'warning');
+          addLog(`Error extracting ${entry.entryName}: ${err.message}`, 'error');
         }
       }
       
       addLog(`Extraction complete: ${extractedCount} files extracted from ${zipEntries.length} total entries`, 'success');
       
+      // List all files in extract directory to verify
+      const allFiles = [];
+      const walkDir = (dir) => {
+        const files = fs.readdirSync(dir);
+        files.forEach(file => {
+          const filepath = path.join(dir, file);
+          const stats = fs.statSync(filepath);
+          if (stats.isDirectory()) {
+            walkDir(filepath);
+          } else {
+            allFiles.push(filepath.replace(extractDir + '/', ''));
+          }
+        });
+      };
+      walkDir(extractDir);
+      addLog(`Total files in directory after extraction: ${allFiles.length}`, 'info');
+      
       resolve({ 
         extractedCount, 
         total: zipEntries.length,
-        files: extractedFiles
+        files: extractedFiles,
+        verifiedFiles: allFiles
       });
     } catch (error) {
+      addLog(`ZIP extraction failed: ${error.message}`, 'error');
       reject(new Error(`Failed to extract ZIP: ${error.message}`));
     }
   });
@@ -668,6 +702,14 @@ app.post('/api/token', (req, res) => {
     addLog(`Error saving token: ${error.message}`, 'error', username);
     res.status(500).json({ error: 'Failed to save token' });
   }
+});
+
+// NEW: Check token status
+app.get('/api/token/status', (req, res) => {
+  res.json({
+    hasToken: !!botToken,
+    tokenLength: botToken ? botToken.length : 0
+  });
 });
 
 app.post('/api/start', async (req, res) => {
