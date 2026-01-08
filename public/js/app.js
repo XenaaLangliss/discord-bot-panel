@@ -26,14 +26,8 @@ class BotControlPanel {
   }
 
   setupGlobalClickHandler() {
-    document.addEventListener('click', (e) => {
-      // Close menu only if clicking outside BOTH menu and button
-      if (this.currentFileMenu && 
-          !e.target.closest('.file-menu-btn') && 
-          !e.target.closest('.file-menu')) {
-        this.closeAllFileMenus();
-      }
-    });
+    // DISABLED AUTO CLOSE - Menu only closes when clicking menu item or close button
+    // Menu will NOT auto-close when clicking outside
   }
 
   closeAllFileMenus() {
@@ -301,6 +295,9 @@ class BotControlPanel {
         } else {
           this.showToast(`Uploaded: ${file.name}`, 'success');
         }
+        
+        // Reset to root and update
+        this.currentPath = '';
         await this.updateFilesList();
         await this.updateStatus();
       } else {
@@ -472,6 +469,9 @@ class BotControlPanel {
 
       if (response.ok) {
         this.showToast(`Extracted ${data.extractedCount} files!`, 'success');
+        
+        // Reset to root and update
+        this.currentPath = '';
         await this.updateFilesList();
         await this.updateStatus();
       } else {
@@ -504,6 +504,12 @@ class BotControlPanel {
 
       if (response.ok) {
         this.showToast(`Deleted: ${filename}`, 'success');
+        
+        // If deleted item is in current path, go back to root
+        if (filename === this.currentPath || filename.startsWith(this.currentPath + '/')) {
+          this.currentPath = '';
+        }
+        
         await this.updateFilesList();
         await this.updateStatus();
       } else {
@@ -609,6 +615,9 @@ class BotControlPanel {
       if (response.ok) {
         this.showToast(`${isFolder ? 'Folder' : 'File'} created successfully!`, 'success');
         modal.remove();
+        
+        // Reset to root and update
+        this.currentPath = '';
         await this.updateFilesList();
         await this.updateStatus();
       } else {
@@ -702,23 +711,37 @@ class BotControlPanel {
       });
 
       // Filter files based on current path
-      const displayFiles = sortedFiles.filter(file => {
-        if (this.currentPath === '') {
-          // Root: show only files without / in name
-          return !file.name.includes('/');
-        } else {
-          // Inside folder: show files that start with currentPath
-          return file.name.startsWith(this.currentPath + '/') && 
-                 file.name.split('/').length === this.currentPath.split('/').length + 1;
-        }
-      });
+      let displayFiles = sortedFiles;
+      
+      if (this.currentPath) {
+        displayFiles = sortedFiles.filter(file => {
+          const relativePath = file.name;
+          const pathParts = relativePath.split('/');
+          const currentParts = this.currentPath.split('/');
+          
+          // Check if file is in current folder
+          if (pathParts.length === currentParts.length + 1) {
+            // Check if all parent parts match
+            for (let i = 0; i < currentParts.length; i++) {
+              if (pathParts[i] !== currentParts[i]) {
+                return false;
+              }
+            }
+            return true;
+          }
+          return false;
+        });
+      } else {
+        // Root: only show files without / in name
+        displayFiles = sortedFiles.filter(file => !file.name.includes('/'));
+      }
 
       // Breadcrumb
       let breadcrumbHTML = `
         <div class="file-breadcrumb">
           <i class="fas fa-folder"></i>
           <span>Path:</span>
-          <span style="color: var(--accent-primary); cursor: pointer;" onclick="botPanel.navigateToFolder('')">
+          <span style="color: var(--accent-primary); cursor: pointer; font-weight: 600;" onclick="botPanel.navigateToFolder('')">
             /home
           </span>
       `;
@@ -730,9 +753,9 @@ class BotControlPanel {
           buildPath += (index > 0 ? '/' : '') + part;
           const finalPath = buildPath;
           breadcrumbHTML += `
-            <span>/</span>
-            <span style="color: var(--accent-primary); cursor: pointer;" onclick="botPanel.navigateToFolder('${finalPath}')">
-              ${part}
+            <span style="color: var(--text-muted);">/</span>
+            <span style="color: var(--accent-primary); cursor: pointer; font-weight: 600;" onclick="botPanel.navigateToFolder('${this.escapeHtml(finalPath)}')">
+              ${this.escapeHtml(part)}
             </span>
           `;
         });
@@ -744,13 +767,21 @@ class BotControlPanel {
         <div style="text-align: center; color: var(--text-muted); padding: 40px;">
           <div style="font-size: 48px; margin-bottom: 16px;"><i class="fas fa-folder-open"></i></div>
           <div>Empty folder</div>
+          <button class="btn btn-secondary btn-sm" style="margin-top: 16px;" onclick="botPanel.navigateToFolder('')">
+            <i class="fas fa-arrow-left"></i> Back to Root
+          </button>
         </div>
       ` : displayFiles.map(file => {
         const icon = this.getFileIcon(file.name, file.isDirectory);
         const isZip = file.type === '.zip';
         const isFolder = file.isDirectory;
         const isEditable = !isFolder && this.isEditableFile(file.name);
-        const displayName = this.currentPath ? file.name.replace(this.currentPath + '/', '') : file.name;
+        
+        // Get display name (remove path prefix)
+        let displayName = file.name;
+        if (this.currentPath) {
+          displayName = file.name.replace(this.currentPath + '/', '');
+        }
         
         return `
           <div class="file-item" ${isFolder ? `style="cursor: pointer;" onclick="botPanel.navigateToFolder('${this.escapeHtml(file.name)}')"` : ''}>
@@ -770,24 +801,24 @@ class BotControlPanel {
               </button>
               <div class="file-menu">
                 ${isEditable ? `
-                  <div class="file-menu-item" onclick="botPanel.editFile('${this.escapeHtml(file.name)}')">
+                  <div class="file-menu-item" onclick="botPanel.editFile('${this.escapeHtml(file.name)}'); botPanel.closeAllFileMenus();">
                     <i class="fas fa-edit"></i>
                     <span>Edit</span>
                   </div>
                 ` : ''}
                 ${isZip ? `
-                  <div class="file-menu-item" onclick="botPanel.extractZip('${this.escapeHtml(file.name)}')">
+                  <div class="file-menu-item" onclick="botPanel.extractZip('${this.escapeHtml(file.name)}'); botPanel.closeAllFileMenus();">
                     <i class="fas fa-file-archive"></i>
                     <span>Extract</span>
                   </div>
                 ` : ''}
                 ${!isFolder ? `
-                  <div class="file-menu-item" onclick="botPanel.copyFilePath('${this.escapeHtml(file.name)}')">
+                  <div class="file-menu-item" onclick="botPanel.copyFilePath('${this.escapeHtml(file.name)}'); botPanel.closeAllFileMenus();">
                     <i class="fas fa-copy"></i>
                     <span>Copy Path</span>
                   </div>
                 ` : ''}
-                <div class="file-menu-item danger" onclick="botPanel.deleteFile('${this.escapeHtml(file.name)}', ${isFolder})">
+                <div class="file-menu-item danger" onclick="botPanel.deleteFile('${this.escapeHtml(file.name)}', ${isFolder}); botPanel.closeAllFileMenus();">
                   <i class="fas fa-trash"></i>
                   <span>Delete</span>
                 </div>
@@ -803,6 +834,7 @@ class BotControlPanel {
 
   navigateToFolder(folderPath) {
     this.currentPath = folderPath;
+    this.closeAllFileMenus(); // Close any open menus
     this.updateFilesList();
   }
 

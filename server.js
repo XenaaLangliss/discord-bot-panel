@@ -447,22 +447,41 @@ app.get('/api/files', (req, res) => {
   }
   
   try {
-    // READ ALL FILES INCLUDING HIDDEN FILES (starting with .)
-    const files = fs.readdirSync(dir, { withFileTypes: true })
-      .map(dirent => {
-        const filepath = path.join(dir, dirent.name);
-        const stats = fs.statSync(filepath);
-        return {
-          name: dirent.name,
-          size: stats.size,
-          type: dirent.isDirectory() ? 'folder' : path.extname(dirent.name),
-          modified: stats.mtime,
-          isDirectory: dirent.isDirectory()
-        };
-      })
-      .sort((a, b) => b.modified - a.modified);
+    // READ ALL FILES INCLUDING HIDDEN FILES - RECURSIVE
+    const getAllFiles = (dirPath, arrayOfFiles = []) => {
+      const files = fs.readdirSync(dirPath, { withFileTypes: true });
+      
+      files.forEach(dirent => {
+        const fullPath = path.join(dirPath, dirent.name);
+        const relativePath = fullPath.replace(dir + '/', '').replace(dir, '');
+        
+        if (dirent.isDirectory()) {
+          arrayOfFiles.push({
+            name: relativePath || dirent.name,
+            size: 0,
+            type: 'folder',
+            modified: fs.statSync(fullPath).mtime,
+            isDirectory: true
+          });
+          // Recursively get files in subdirectories
+          getAllFiles(fullPath, arrayOfFiles);
+        } else {
+          const stats = fs.statSync(fullPath);
+          arrayOfFiles.push({
+            name: relativePath || dirent.name,
+            size: stats.size,
+            type: path.extname(dirent.name),
+            modified: stats.mtime,
+            isDirectory: false
+          });
+        }
+      });
+      
+      return arrayOfFiles;
+    };
     
-    res.json(files);
+    const allFiles = getAllFiles(dir);
+    res.json(allFiles);
   } catch (error) {
     addLog(`Error reading files: ${error.message}`, 'error', req.session.username);
     res.status(500).json({ error: 'Failed to read files' });
