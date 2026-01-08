@@ -37,8 +37,12 @@
 
       <nav class="sidebar-nav">
         <div class="nav-section">
-          <div class="nav-section-title">Management</div>
-          <a href="#" class="nav-item active" data-page="console">
+          <div class="nav-section-title">Main</div>
+          <a href="#" class="nav-item active" data-page="dashboard">
+            <span class="nav-item-icon"><i class="fas fa-home"></i></span>
+            <span>Dashboard</span>
+          </a>
+          <a href="#" class="nav-item" data-page="console">
             <span class="nav-item-icon"><i class="fas fa-terminal"></i></span>
             <span>Console</span>
           </a>
@@ -76,8 +80,162 @@
 
     <!-- Main Content -->
     <main class="main-content">
+      <!-- Page: Dashboard -->
+      <div id="page-dashboard" class="page-content">
+        <div class="page-header">
+          <h1 class="page-title">Dashboard</h1>
+          <p class="page-description">Welcome to Discord Bot Control Panel v3.0</p>
+        </div>
+
+        <!-- Stats Overview -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-header">
+              <span class="stat-label">System Status</span>
+              <div class="stat-icon success" id="systemStatusIcon">
+                <i class="fas fa-server"></i>
+              </div>
+            </div>
+            <div class="stat-value" id="systemStatus">ONLINE</div>
+            <div class="stat-description">Control Panel is running</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-header">
+              <span class="stat-label">Bot Status</span>
+              <div class="stat-icon danger" id="botStatusIcon">
+                <i class="fas fa-robot"></i>
+              </div>
+            </div>
+            <div class="stat-value" id="botStatus">OFFLINE</div>
+            <div class="stat-description">Discord bot is stopped</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-header">
+              <span class="stat-label">Memory Usage</span>
+              <div class="stat-icon info">
+                <i class="fas fa-memory"></i>
+              </div>
+            </div>
+            <div class="stat-value" id="memoryUsage">--</div>
+            <div class="stat-description">System memory</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-header">
+              <span class="stat-label">Files</span>
+              <div class="stat-icon warning">
+                <i class="fas fa-folder"></i>
+              </div>
+            </div>
+            <div class="stat-value" id="totalFilesCount">0</div>
+            <div class="stat-description">Bot files uploaded</div>
+          </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <span class="card-title-icon"><i class="fas fa-bolt"></i></span>
+              <span>Quick Actions</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="quick-actions-grid">
+              <a href="#" class="quick-action-btn" data-page="console">
+                <div class="quick-action-icon">
+                  <i class="fas fa-terminal"></i>
+                </div>
+                <div class="quick-action-title">Console</div>
+                <div class="quick-action-desc">Manage bot & view logs</div>
+              </a>
+
+              <a href="#" class="quick-action-btn" data-page="files">
+                <div class="quick-action-icon">
+                  <i class="fas fa-folder"></i>
+                </div>
+                <div class="quick-action-title">File Manager</div>
+                <div class="quick-action-desc">Upload & edit files</div>
+              </a>
+
+              <a href="#" class="quick-action-btn" data-page="settings">
+                <div class="quick-action-icon">
+                  <i class="fas fa-cog"></i>
+                </div>
+                <div class="quick-action-title">Settings</div>
+                <div class="quick-action-desc">Configure bot token</div>
+              </a>
+
+              <a href="#" class="quick-action-btn" data-page="node-settings">
+                <div class="quick-action-icon">
+                  <i class="fas fa-code-branch"></i>
+                </div>
+                <div class="quick-action-title">Node Version</div>
+                <div class="quick-action-desc">Switch Node.js version</div>
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Server List (Placeholder for future integration) -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <span class="card-title-icon"><i class="fas fa-server"></i></span>
+              <span>Your Servers</span>
+            </div>
+            <span class="card-badge">Coming Soon</span>
+          </div>
+          <div class="card-body">
+            <div class="server-list">
+              <div class="server-item">
+                <div class="server-icon">
+                  <i class="fas fa-robot"></i>
+                </div>
+                <div class="server-info">
+                  <div class="server-name">Discord Bot Server</div>
+                  <div class="server-desc">Primary bot management server</div>
+                </div>
+                <div class="server-status offline">Offline</div>
+              </div>
+              <div class="server-item">
+                <div class="server-icon">
+                  <i class="fas fa-gamepad"></i>
+                </div>
+                <div class="server-info">
+                  <div class="server-name">Gaming Community</div>
+                  <div class="server-desc">For gaming and community events</div>
+                </div>
+                <div class="server-status online">Online</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <span class="card-title-icon"><i class="fas fa-history"></i></span>
+              <span>Recent Activity</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div id="recentActivity">
+              <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+                <i class="fas fa-history" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;"></i>
+                <div>No recent activity</div>
+                <div style="font-size: 13px; margin-top: 8px;">Start your bot to see activity here</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Page: Console -->
-      <div id="page-console" class="page-content">
+      <div id="page-console" class="page-content hidden">
         <div class="page-header">
           <h1 class="page-title">Bot Console</h1>
           <p class="page-description">Monitor and control your Discord bot in real-time</p>
@@ -188,7 +346,7 @@
             <div class="console" id="console">
               <div class="console-line info">
                 <span class="console-timestamp">[00:00:00]</span>
-                <span>Bot Control Panel v2.0 - Waiting for bot to start...</span>
+                <span>Bot Control Panel v3.0 - Waiting for bot to start...</span>
               </div>
             </div>
           </div>
@@ -230,7 +388,7 @@
                 <span style="font-weight: 600; color: var(--text-primary);">Files & Folders</span>
                 <span class="stat-description">Total: <strong id="totalFiles">0</strong></span>
               </div>
-            <div class="file-list" id="fileList">
+              <div class="file-list" id="fileList">
               </div>
             </div>
           </div>
@@ -303,8 +461,9 @@
                 </div>
               </div>
               <div>
-                <div class="form-label">✨ New Features v2.0</div>
+                <div class="form-label">✨ New Features v3.0</div>
                 <div style="color: var(--text-secondary); line-height: 1.8;">
+                  <i class="fas fa-check-circle" style="color: var(--success);"></i> Dashboard Overview<br>
                   <i class="fas fa-check-circle" style="color: var(--success);"></i> File Editor (Edit .js, .json, .txt, etc)<br>
                   <i class="fas fa-check-circle" style="color: var(--success);"></i> Create Files/Folders<br>
                   <i class="fas fa-check-circle" style="color: var(--success);"></i> ZIP Extraction<br>
@@ -431,7 +590,7 @@
                   <i class="fas fa-edit"></i> 6. File Management (NEW!)
                 </h3>
                 <p style="color: var(--text-secondary); line-height: 1.8;">
-                  <strong>New in v2.0:</strong> Click the three-dot menu (⋮) on any file to:
+                  <strong>New in v3.0:</strong> Click the three-dot menu (⋮) on any file to:
                 </p>
                 <ul style="color: var(--text-secondary); line-height: 1.8; margin-left: 20px;">
                   <li><strong>Edit:</strong> Edit text files directly in browser</li>
@@ -442,6 +601,21 @@
                 <p style="color: var(--text-secondary); line-height: 1.8; margin-top: 8px;">
                   Use the <strong>"Create New"</strong> button to create files or folders instantly!
                 </p>
+              </div>
+              
+              <div>
+                <h3 style="color: var(--accent-primary); margin-bottom: 8px;">
+                  <i class="fas fa-home"></i> 7. Dashboard (NEW!)
+                </h3>
+                <p style="color: var(--text-secondary); line-height: 1.8;">
+                  <strong>New in v3.0:</strong> After login, you'll see the Dashboard with:
+                </p>
+                <ul style="color: var(--text-secondary); line-height: 1.8; margin-left: 20px;">
+                  <li>System and bot status overview</li>
+                  <li>Quick actions to access all features</li>
+                  <li>Server list (placeholder for future integration)</li>
+                  <li>Recent activity monitoring</li>
+                </ul>
               </div>
             </div>
           </div>

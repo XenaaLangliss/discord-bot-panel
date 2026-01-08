@@ -344,6 +344,31 @@ const extractZipFile = async (zipPath, extractDir) => {
   });
 };
 
+// Helper to get folder size
+const getFolderSize = (folderPath) => {
+  let totalSize = 0;
+  
+  const calculateSize = (dir) => {
+    if (fs.existsSync(dir)) {
+      const items = fs.readdirSync(dir);
+      
+      for (const item of items) {
+        const itemPath = path.join(dir, item);
+        const stats = fs.statSync(itemPath);
+        
+        if (stats.isDirectory()) {
+          calculateSize(itemPath);
+        } else {
+          totalSize += stats.size;
+        }
+      }
+    }
+  };
+  
+  calculateSize(folderPath);
+  return (totalSize / 1024 / 1024).toFixed(2); // Return in MB
+};
+
 // ==================== AUTHENTICATION ROUTES ====================
 app.get('/login', (req, res) => {
   if (req.session.authenticated) {
@@ -396,6 +421,41 @@ app.get('/api/auth/status', (req, res) => {
     authenticated: !!req.session.authenticated,
     username: req.session.username,
     loginTime: req.session.loginTime
+  });
+});
+
+// ==================== DASHBOARD ROUTES ====================
+app.get('/api/dashboard', (req, res) => {
+  const memoryUsage = process.memoryUsage();
+  const systemUptime = process.uptime();
+  
+  if (botStatus === 'running' && botStartTime) {
+    uptime = Date.now() - botStartTime;
+  }
+  
+  res.json({
+    system: {
+      nodeVersion: process.version,
+      platform: process.platform,
+      arch: process.arch,
+      uptime: systemUptime,
+      memory: {
+        used: memoryUsage.heapUsed,
+        total: memoryUsage.heapTotal,
+        percent: (memoryUsage.heapUsed / memoryUsage.heapTotal * 100).toFixed(1)
+      }
+    },
+    bot: {
+      status: botStatus,
+      uptime: uptime,
+      tokenSet: !!botToken,
+      nodeVersion: selectedNodeVersion,
+      logsCount: logs.length
+    },
+    files: {
+      total: fs.existsSync('./home') ? fs.readdirSync('./home').length : 0,
+      size: getFolderSize('./home')
+    }
   });
 });
 
@@ -1084,10 +1144,11 @@ process.on('unhandledRejection', (reason, promise) => {
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ============================================
-  🤖 Discord Bot Control Panel v2.0
+  🤖 Discord Bot Control Panel v3.0
   ============================================
   ✅ Server running on port ${PORT}
   ✅ Authentication: Enabled
+  ✅ Dashboard: Enabled
   ✅ Manual ZIP Extraction: Enabled
   ✅ File Editor: Enabled
   ✅ Create File/Folder: Enabled

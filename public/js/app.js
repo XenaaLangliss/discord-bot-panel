@@ -1,10 +1,10 @@
-// Discord Bot Control Panel v2.0 - Enhanced with File Editor
+// Discord Bot Control Panel v3.0 - Enhanced with Dashboard & File Editor
 
 class BotControlPanel {
   constructor() {
     this.pollInterval = null;
     this.isPolling = false;
-    this.currentPage = 'console';
+    this.currentPage = 'dashboard'; // Default to dashboard
     this.uptimeInterval = null;
     this.currentFileMenu = null;
     this.activeToasts = []; // Track active toasts
@@ -23,16 +23,26 @@ class BotControlPanel {
     this.startPolling();
     this.updateMemoryUsage();
     this.setupGlobalClickHandler();
+    this.updateDashboard(); // Load dashboard on init
   }
 
   setupGlobalClickHandler() {
-    // DISABLED AUTO CLOSE - Menu only closes when clicking menu item or close button
-    // Menu will NOT auto-close when clicking outside
+    // Close menu when clicking outside (except on menu button)
+    document.addEventListener('click', (event) => {
+      if (this.currentFileMenu && 
+          !this.currentFileMenu.contains(event.target) && 
+          !event.target.closest('.file-menu-btn')) {
+        this.closeAllFileMenus();
+      }
+    });
   }
 
   closeAllFileMenus() {
     document.querySelectorAll('.file-menu').forEach(menu => {
       menu.classList.remove('active');
+      // Remove close button if exists
+      const closeBtn = menu.querySelector('.menu-close-btn');
+      if (closeBtn) closeBtn.remove();
     });
     this.currentFileMenu = null;
   }
@@ -132,7 +142,7 @@ class BotControlPanel {
   }
 
   setupNavigation() {
-    const navItems = document.querySelectorAll('.nav-item[data-page]');
+    const navItems = document.querySelectorAll('.nav-item[data-page], .quick-action-btn[data-page]');
     navItems.forEach(item => {
       item.addEventListener('click', (e) => {
         e.preventDefault();
@@ -155,7 +165,9 @@ class BotControlPanel {
 
     this.currentPage = pageName;
 
-    if (pageName === 'files') {
+    if (pageName === 'dashboard') {
+      this.updateDashboard();
+    } else if (pageName === 'files') {
       this.updateFilesList();
     } else if (pageName === 'node-settings') {
       this.loadNodeVersions();
@@ -217,116 +229,42 @@ class BotControlPanel {
     return;
   }
 
-  async saveToken() {
-    const tokenInput = document.getElementById('tokenInput');
-    const token = tokenInput?.value.trim();
-
-    if (!token) {
-      this.showToast('Please enter a bot token', 'error');
-      return;
-    }
-
-    const saveBtn = document.getElementById('saveTokenBtn');
-    const originalText = saveBtn.innerHTML;
-    saveBtn.disabled = true;
-    saveBtn.innerHTML = '<span class="spinner"></span><span>Saving...</span>';
-
-    try {
-      const response = await fetch('/api/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token })
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        this.showToast('Token saved successfully!', 'success');
-        tokenInput.value = '';
-        await this.updateStatus();
-      } else {
-        this.showToast(data.error || 'Failed to save token', 'error');
-      }
-    } catch (error) {
-      console.error('Error saving token:', error);
-      this.showToast('Network error. Please try again.', 'error');
-    } finally {
-      saveBtn.disabled = false;
-      saveBtn.innerHTML = originalText;
-    }
-  }
-
-  async handleFileUpload(event) {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
-    
-    for (let i = 0; i < files.length; i++) {
-      await this.uploadFile(files[i]);
-    }
-    event.target.value = '';
-  }
-
-  async uploadFile(file) {
-    const maxSize = 100 * 1024 * 1024; // 100MB
-    if (file.size > maxSize) {
-      this.showToast('File too large. Maximum size: 100MB', 'error');
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append('file', file);
-
-    const uploadBtn = document.getElementById('uploadBtn');
-    const originalText = uploadBtn.innerHTML;
-    uploadBtn.disabled = true;
-    uploadBtn.innerHTML = '<span class="spinner"></span> Uploading...';
-
-    try {
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        if (data.isZip) {
-          this.showToast(`📦 ZIP uploaded: ${file.name}`, 'success');
-        } else {
-          this.showToast(`Uploaded: ${file.name}`, 'success');
-        }
-        
-        // Reset to root and update
-        this.currentPath = '';
-        await this.updateFilesList();
-        await this.updateStatus();
-      } else {
-        this.showToast(data.error || 'Upload failed', 'error');
-      }
-    } catch (error) {
-      console.error('Error uploading file:', error);
-      this.showToast('Upload failed. Please try again.', 'error');
-    } finally {
-      uploadBtn.disabled = false;
-      uploadBtn.innerHTML = originalText;
-    }
-  }
-
-  // FILE MENU SYSTEM
+  // ==================== PERBAIKAN MENU FILE ====================
   toggleFileMenu(filename, event) {
     event.stopPropagation();
+    event.preventDefault();
     
+    // Tutup semua menu yang terbuka
+    this.closeAllFileMenus();
+    
+    // Cari menu untuk file ini
     const menu = event.target.closest('.file-item').querySelector('.file-menu');
-    const allMenus = document.querySelectorAll('.file-menu');
     
-    allMenus.forEach(m => {
-      if (m !== menu) {
-        m.classList.remove('active');
-      }
+    // Tampilkan menu
+    menu.classList.add('active');
+    this.currentFileMenu = menu;
+    
+    // Tambah tombol close untuk mobile
+    if (window.innerWidth <= 768) {
+      this.addMenuCloseButton(menu);
+    }
+  }
+
+  addMenuCloseButton(menu) {
+    // Hapus tombol close yang sudah ada
+    const existingClose = menu.querySelector('.menu-close-btn');
+    if (existingClose) existingClose.remove();
+    
+    // Tambah tombol close baru
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'menu-close-btn';
+    closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+    closeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.closeAllFileMenus();
     });
     
-    menu.classList.toggle('active');
-    this.currentFileMenu = menu.classList.contains('active') ? menu : null;
+    menu.appendChild(closeBtn);
   }
 
   // EDIT FILE
@@ -474,6 +412,7 @@ class BotControlPanel {
         this.currentPath = '';
         await this.updateFilesList();
         await this.updateStatus();
+        await this.updateDashboard();
       } else {
         this.showToast(data.error || 'Extraction failed', 'error');
       }
@@ -512,6 +451,7 @@ class BotControlPanel {
         
         await this.updateFilesList();
         await this.updateStatus();
+        await this.updateDashboard();
       } else {
         const data = await response.json();
         this.showToast(data.error || 'Delete failed', 'error');
@@ -620,6 +560,7 @@ class BotControlPanel {
         this.currentPath = '';
         await this.updateFilesList();
         await this.updateStatus();
+        await this.updateDashboard();
       } else {
         const data = await response.json();
         this.showToast(data.error || 'Failed to create', 'error');
@@ -634,52 +575,55 @@ class BotControlPanel {
     }
   }
 
-  // MODERN CONFIRMATION DIALOG
-  showConfirmDialog(title, message, confirmText, cancelText) {
-    return new Promise((resolve) => {
-      const dialog = document.createElement('div');
-      dialog.className = 'confirm-dialog-overlay';
-      dialog.innerHTML = `
-        <div class="confirm-dialog">
-          <div class="confirm-dialog-header">
-            <h3><i class="fas fa-exclamation-triangle"></i> ${this.escapeHtml(title)}</h3>
-          </div>
-          <div class="confirm-dialog-body">
-            <p>${this.escapeHtml(message)}</p>
-          </div>
-          <div class="confirm-dialog-footer">
-            <button class="btn btn-secondary" id="cancelBtn">${this.escapeHtml(cancelText)}</button>
-            <button class="btn btn-danger" id="confirmBtn">${this.escapeHtml(confirmText)}</button>
-          </div>
-        </div>
-      `;
+  // ==================== DASHBOARD FUNCTIONS ====================
+  async updateDashboard() {
+    try {
+      const response = await fetch('/api/dashboard');
+      if (!response.ok) throw new Error('Failed to fetch dashboard data');
       
-      document.body.appendChild(dialog);
+      const data = await response.json();
       
-      const confirmBtn = dialog.querySelector('#confirmBtn');
-      const cancelBtn = dialog.querySelector('#cancelBtn');
+      // Update system status
+      const systemStatus = document.getElementById('systemStatus');
+      const systemStatusIcon = document.getElementById('systemStatusIcon');
+      if (systemStatus) systemStatus.textContent = 'ONLINE';
+      if (systemStatusIcon) {
+        systemStatusIcon.className = 'stat-icon success';
+        systemStatusIcon.innerHTML = '<i class="fas fa-check-circle"></i>';
+      }
       
-      const cleanup = () => {
-        dialog.remove();
-      };
+      // Update bot status
+      const botStatus = document.getElementById('botStatus');
+      const botStatusIcon = document.getElementById('botStatusIcon');
+      const isBotRunning = data.bot.status === 'running';
       
-      confirmBtn.addEventListener('click', () => {
-        cleanup();
-        resolve(true);
-      });
+      if (botStatus) {
+        botStatus.textContent = isBotRunning ? 'ONLINE' : 'OFFLINE';
+      }
       
-      cancelBtn.addEventListener('click', () => {
-        cleanup();
-        resolve(false);
-      });
+      if (botStatusIcon) {
+        botStatusIcon.className = `stat-icon ${isBotRunning ? 'success' : 'danger'}`;
+        botStatusIcon.innerHTML = isBotRunning ? 
+          '<i class="fas fa-check-circle"></i>' : 
+          '<i class="fas fa-exclamation-triangle"></i>';
+      }
       
-      dialog.addEventListener('click', (e) => {
-        if (e.target === dialog) {
-          cleanup();
-          resolve(false);
-        }
-      });
-    });
+      // Update memory usage
+      const memoryUsage = document.getElementById('memoryUsage');
+      if (memoryUsage && data.system.memory) {
+        const usedMB = (data.system.memory.used / 1024 / 1024).toFixed(2);
+        memoryUsage.textContent = `${usedMB} MB`;
+      }
+      
+      // Update files count
+      const totalFiles = document.getElementById('totalFilesCount');
+      if (totalFiles) {
+        totalFiles.textContent = data.files.total;
+      }
+      
+    } catch (error) {
+      console.error('Error updating dashboard:', error);
+    }
   }
 
   async updateFilesList() {
@@ -872,6 +816,151 @@ class BotControlPanel {
     return icons[ext] || '<i class="fas fa-file"></i>';
   }
 
+  // MODERN CONFIRMATION DIALOG
+  showConfirmDialog(title, message, confirmText, cancelText) {
+    return new Promise((resolve) => {
+      const dialog = document.createElement('div');
+      dialog.className = 'confirm-dialog-overlay';
+      dialog.innerHTML = `
+        <div class="confirm-dialog">
+          <div class="confirm-dialog-header">
+            <h3><i class="fas fa-exclamation-triangle"></i> ${this.escapeHtml(title)}</h3>
+          </div>
+          <div class="confirm-dialog-body">
+            <p>${this.escapeHtml(message)}</p>
+          </div>
+          <div class="confirm-dialog-footer">
+            <button class="btn btn-secondary" id="cancelBtn">${this.escapeHtml(cancelText)}</button>
+            <button class="btn btn-danger" id="confirmBtn">${this.escapeHtml(confirmText)}</button>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(dialog);
+      
+      const confirmBtn = dialog.querySelector('#confirmBtn');
+      const cancelBtn = dialog.querySelector('#cancelBtn');
+      
+      const cleanup = () => {
+        dialog.remove();
+      };
+      
+      confirmBtn.addEventListener('click', () => {
+        cleanup();
+        resolve(true);
+      });
+      
+      cancelBtn.addEventListener('click', () => {
+        cleanup();
+        resolve(false);
+      });
+      
+      dialog.addEventListener('click', (e) => {
+        if (e.target === dialog) {
+          cleanup();
+          resolve(false);
+        }
+      });
+    });
+  }
+
+  async saveToken() {
+    const tokenInput = document.getElementById('tokenInput');
+    const token = tokenInput?.value.trim();
+
+    if (!token) {
+      this.showToast('Please enter a bot token', 'error');
+      return;
+    }
+
+    const saveBtn = document.getElementById('saveTokenBtn');
+    const originalText = saveBtn.innerHTML;
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<span class="spinner"></span><span>Saving...</span>';
+
+    try {
+      const response = await fetch('/api/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        this.showToast('Token saved successfully!', 'success');
+        tokenInput.value = '';
+        await this.updateStatus();
+        await this.updateDashboard();
+      } else {
+        this.showToast(data.error || 'Failed to save token', 'error');
+      }
+    } catch (error) {
+      console.error('Error saving token:', error);
+      this.showToast('Network error. Please try again.', 'error');
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = originalText;
+    }
+  }
+
+  async handleFileUpload(event) {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    
+    for (let i = 0; i < files.length; i++) {
+      await this.uploadFile(files[i]);
+    }
+    event.target.value = '';
+  }
+
+  async uploadFile(file) {
+    const maxSize = 100 * 1024 * 1024; // 100MB
+    if (file.size > maxSize) {
+      this.showToast('File too large. Maximum size: 100MB', 'error');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const uploadBtn = document.getElementById('uploadBtn');
+    const originalText = uploadBtn.innerHTML;
+    uploadBtn.disabled = true;
+    uploadBtn.innerHTML = '<span class="spinner"></span> Uploading...';
+
+    try {
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        if (data.isZip) {
+          this.showToast(`📦 ZIP uploaded: ${file.name}`, 'success');
+        } else {
+          this.showToast(`Uploaded: ${file.name}`, 'success');
+        }
+        
+        // Reset to root and update
+        this.currentPath = '';
+        await this.updateFilesList();
+        await this.updateStatus();
+        await this.updateDashboard();
+      } else {
+        this.showToast(data.error || 'Upload failed', 'error');
+      }
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      this.showToast('Upload failed. Please try again.', 'error');
+    } finally {
+      uploadBtn.disabled = false;
+      uploadBtn.innerHTML = originalText;
+    }
+  }
+
   async startBot() {
     const startBtn = document.getElementById('startBtn');
     const originalText = startBtn.innerHTML;
@@ -885,6 +974,7 @@ class BotControlPanel {
       if (response.ok) {
         this.showToast('🚀 Bot is starting...', 'success');
         await this.updateStatus();
+        await this.updateDashboard();
       } else {
         this.showToast(data.error || 'Failed to start', 'error');
         startBtn.disabled = false;
@@ -910,6 +1000,7 @@ class BotControlPanel {
       if (response.ok) {
         this.showToast('Bot stopped', 'success');
         await this.updateStatus();
+        await this.updateDashboard();
       } else {
         const data = await response.json();
         this.showToast(data.error || 'Failed to stop', 'error');
@@ -1137,6 +1228,7 @@ class BotControlPanel {
         this.showToast(`Switched to Node.js ${version}`, 'success');
         this.loadNodeVersions();
         this.updateStatus();
+        this.updateDashboard();
       } else {
         const errorData = await response.json();
         this.showToast(errorData.error || 'Failed to switch version', 'error');
@@ -1199,6 +1291,7 @@ class BotControlPanel {
 
     this.isPolling = true;
     this.updateStatus();
+    this.updateDashboard();
     
     if (this.currentPage === 'files') {
       this.updateFilesList();
@@ -1206,6 +1299,7 @@ class BotControlPanel {
 
     this.pollInterval = setInterval(() => {
       this.updateStatus();
+      this.updateDashboard();
       
       if (this.currentPage === 'files') {
         this.updateFilesList();
@@ -1269,8 +1363,8 @@ let botPanel;
 
 document.addEventListener('DOMContentLoaded', () => {
   botPanel = new BotControlPanel();
-  console.log('%c🤖 Bot Control Panel v2.0', 'color: #5865f2; font-size: 16px; font-weight: bold;');
-  console.log('%c✨ Enhanced with File Editor & Create File/Folder', 'color: #43b581;');
+  console.log('%c🤖 Bot Control Panel v3.0', 'color: #5865f2; font-size: 16px; font-weight: bold;');
+  console.log('%c✨ Enhanced with Dashboard & File Editor', 'color: #43b581;');
 });
 
 window.addEventListener('beforeunload', () => {
